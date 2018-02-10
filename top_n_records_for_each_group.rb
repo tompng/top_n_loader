@@ -6,7 +6,7 @@ class ActiveRecord::Relation
     elsif join.is_a? Symbol
       foreign_key = join_condition
     end
-    foreign_key ||= name.foreign_key
+    foreign_key ||= klass.name.foreign_key
 
     order_key = target_klass.primary_key
     order_mode = :asc
