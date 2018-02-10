@@ -1,5 +1,6 @@
 class ActiveRecord::Relation
-  def each_limit_group target_klass, join: nil, order: nil, limit: 1
+  def limit_grouped_childs target_klass, join: nil, order: nil, limit: 1
+    target_klass = klass.reflections[target_klass.to_s].klass if target_klass.is_a? Symbol
     primary_key = klass.primary_key
     if join.is_a? Hash
       ((primary_key, foreign_key)) = join.to_a
@@ -48,12 +49,12 @@ class ActiveRecord::Relation
         order_key: order_key,
         offset: [0, limit.to_i - 1].max
       }
-    ]).group_by(&foreign_key.to_sym)
+    ]).group_by { |record| record[foreign_key] }
   end
 end
 
 User.first.post_ids # => [1, 3, 9, 10, 15, 18, 19]
-User.first.posts.each_limit_group(Comment, order: { created_at: :desc }, limit: 2)
+User.first.posts.limit_grouped_childs(:comments, order: { created_at: :desc }, limit: 2)
 __END__
 {1=>
   [#<Comment:0x00007fb49d710418 id: 60, post_id: 1>,
