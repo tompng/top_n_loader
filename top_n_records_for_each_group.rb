@@ -21,31 +21,28 @@ class ActiveRecord::Relation
       'desc' => { mode: :DESC, op: '>=' }
     }[order_mode.to_s.downcase]
 
+    table_name = klass.table_name
+    target_table_name = target_klass.table_name
     target_klass.find_by_sql([
       %(
         SELECT *
         FROM (
-          SELECT :table_name.:primary_key AS key,
+          SELECT "#{table_name}"."#{primary_key}" AS key,
           (
-            SELECT :target_table_name.:order_key FROM :target_table_name
-            WHERE :target_table_name.:foreign_key = :table_name.:primary_key
-            ORDER BY :target_table_name.:order_key #{ordering[:mode]} LIMIT :offset, 1
+            SELECT "#{target_table_name}"."#{order_key}" FROM "#{target_table_name}"
+            WHERE "#{target_table_name}"."#{foreign_key}" = "#{table_name}"."#{primary_key}"
+            ORDER BY "#{target_table_name}"."#{order_key}" #{ordering[:mode]} OFFSET :offset LIMIT 1
           ) AS last_value
-          FROM :table_name
-          WHERE :table_name.:primary_key in (:primary_keys)
+          FROM "#{table_name}"
+          WHERE "#{table_name}"."#{primary_key}" in (:primary_keys)
         ) T
-        INNER JOIN :target_table_name ON
-          :target_table_name.:foreign_key = T.key AND
-          (T.last_value IS NULL OR :target_table_name.:order_key #{ordering[:op]} T.last_value)
-        ORDER BY :target_table_name.:order_key #{ordering[:mode]}
+        INNER JOIN "#{target_table_name}" ON
+          "#{target_table_name}"."#{foreign_key}" = T.key AND
+          (T.last_value IS NULL OR "#{target_table_name}"."#{order_key}" #{ordering[:op]} T.last_value)
+        ORDER BY "#{target_table_name}"."#{order_key}" #{ordering[:mode]}
       ),
       {
         primary_keys: loaded? ? map { |record| record[primary_key] } : pluck(primary_key),
-        table_name: klass.table_name,
-        target_table_name: target_klass.table_name,
-        primary_key: primary_key,
-        foreign_key: foreign_key,
-        order_key: order_key,
         offset: [0, limit.to_i - 1].max
       }
     ]).group_by { |record| record[foreign_key] }
