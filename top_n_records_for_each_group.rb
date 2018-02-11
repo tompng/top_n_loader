@@ -1,23 +1,35 @@
 module TopNRecords
-  def self.top_n_records(klass, primary_keys, target_klass, limit:, join: nil, order: nil, condition: nil)
-    primary_key = klass.primary_key
-    if join.is_a? Hash
-      raise 'j'+join.to_s unless join.size == 1
-      primary_key, foreign_key = join.to_a.first
-    elsif join.is_a? Symbol
-      foreign_key = join_condition
+  def self.parse_join(klass, join)
+    case join
+    when Hash
+      raise ArgumentError, 'invalid join' unless join.size == 1
+      join.first
+    when Symbol
+      [klass.primary_key, join_condition]
+    when NilClass
+      [klass.primary_key, klass.name.foreign_key]
+    else
+      raise ArgumentError, 'invalid join'
     end
-    foreign_key ||= klass.name.foreign_key
+  end
 
-    order_key = target_klass.primary_key
-    order_mode = :asc
-    if order.is_a? Hash
-      raise 'o'+order.to_s unless order.size == 1
-      order_key, order_mode = order.to_a.first
-    elsif order.is_a? Symbol
-      order_key = order
+  def self.parse_order(klass, order)
+    case order
+    when Hash
+      raise ArgumentError, 'invalid order' unless order.size == 1 && %i[asc desc].include?(order.first.last)
+      order.first
+    when Symbol
+      [order, :asc]
+    when NilClass
+      [target_klass.primary_key, :asc]
+    else
+      raise ArgumentError, 'invalid order'
     end
-    raise 'k'+order_mode.to_s unless %i[asc desc].include? order_mode
+  end
+
+  def self.top_n_records(klass, primary_keys, target_klass, limit:, join: nil, order: nil, condition: nil)
+    primary_key, foreign_key = parse_join klass, join
+    order_key, order_mode = parse_order klass, order
 
     sql = TopNRecords::SQLBuilder.top_n_sql(
       table_name: klass.table_name,
