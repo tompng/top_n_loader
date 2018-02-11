@@ -97,7 +97,7 @@ module TopNRecords
 end
 
 class ActiveRecord::Relation
-  def top_n_child_records(target_klass, option)
+  def top_n_child_records(target_klass, option = {})
     primary_keys = loaded? ? map { |o| o[primary_key] } : pluck(primary_key)
     TopNRecords.top_n_records klass, primary_keys, target_klass, option
   end
