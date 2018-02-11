@@ -22,7 +22,7 @@ class ActiveRecord::Relation
 
     if order_mode == :asc
       order_op = :<
-    elsif order_mode = :desc
+    elsif order_mode == :desc
       order_op = :>
     else
       raise
