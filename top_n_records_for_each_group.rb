@@ -17,8 +17,8 @@ class ActiveRecord::Relation
     end
 
     ordering = {
-      'asc' => { mode: :ASC, op: '<=' },
-      'desc' => { mode: :DESC, op: '>=' }
+      'asc' => { mode: :ASC, op: '<' },
+      'desc' => { mode: :DESC, op: '>' }
     }[order_mode.to_s.downcase]
 
     table_name = klass.table_name
@@ -31,7 +31,7 @@ class ActiveRecord::Relation
           (
             SELECT "#{target_table_name}"."#{order_key}" FROM "#{target_table_name}"
             WHERE "#{target_table_name}"."#{foreign_key}" = "#{table_name}"."#{primary_key}"
-            ORDER BY "#{target_table_name}"."#{order_key}" #{ordering[:mode]} OFFSET :offset LIMIT 1
+            ORDER BY "#{target_table_name}"."#{order_key}" #{ordering[:mode]} LIMIT 1 OFFSET :offset
           ) AS last_value
           FROM "#{table_name}"
           WHERE "#{table_name}"."#{primary_key}" in (:primary_keys)
@@ -43,14 +43,14 @@ class ActiveRecord::Relation
       ),
       {
         primary_keys: loaded? ? map { |record| record[primary_key] } : pluck(primary_key),
-        offset: [0, limit.to_i - 1].max
+        offset: limit
       }
     ]).group_by { |record| record[foreign_key] }
   end
 end
 
 User.first.post_ids # => [1, 3, 9, 10, 15, 18, 19]
-User.first.posts.each_limit_group(:comments, order: { created_at: :desc }, limit: 2)
+User.first.posts.each_limit_group(Comment, order: { created_at: :desc }, limit: 2)
 __END__
 {1=>
   [#<Comment:0x00007fb49d710418 id: 60, post_id: 1>,
