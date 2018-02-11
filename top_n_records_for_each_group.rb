@@ -1,36 +1,50 @@
-class ActiveRecord::Relation
-  def top_n_child_records target_klass, limit, join: nil, order: nil, sql: nil
+module TopNRecords
+  def self.top_n_records(klass, primary_keys, target_klass, limit:, join: nil, order: nil, condition: nil)
     primary_key = klass.primary_key
     if join.is_a? Hash
-      raise unless order.size == 1
+      raise 'j'+join.to_s unless join.size == 1
       primary_key, foreign_key = join.to_a.first
     elsif join.is_a? Symbol
       foreign_key = join_condition
     end
     foreign_key ||= klass.name.foreign_key
 
-    condition_sql = ActiveRecord::Base.send :sanitize_sql_array, sql if sql
-
     order_key = target_klass.primary_key
     order_mode = :asc
     if order.is_a? Hash
-      raise unless order.size == 1
+      raise 'o'+order.to_s unless order.size == 1
       order_key, order_mode = order.to_a.first
     elsif order.is_a? Symbol
       order_key = order
     end
+    raise 'k'+order_mode.to_s unless %i[asc desc].include? order_mode
 
-    if order_mode == :asc
-      order_op = :<
-    elsif order_mode == :desc
-      order_op = :>
-    else
-      raise
+    sql = TopNRecords::SQLBuilder.top_n_sql(
+      table_name: klass.table_name,
+      target_table_name: target_klass.table_name,
+      primary_key: primary_key,
+      foreign_key: foreign_key,
+      order_mode: order_mode,
+      order_key: order_key,
+      condition: condition
+    )
+    records = target_klass.find_by_sql([sql, primary_keys: primary_keys, offset: limit])
+    result = Hash.new { [] }.merge(records.group_by { |o| o[foreign_key] })
+    order_sub_key = target_klass.primary_key
+    result.transform_values do |grouped_records|
+      existings, blanks = grouped_records.partition { |o| o[order_key] }
+      existings.sort_by! { |o| [o[order_key], o[order_sub_key]] }
+      blanks.sort_by! { |o| o[order_sub_key] }
+      ordered = existings + blanks
+      ordered.reverse! if order_mode == :desc
+      ordered.take limit
     end
+  end
 
-    table_name = klass.table_name
-    target_table_name = target_klass.table_name
-    target_klass.find_by_sql([
+  module SQLBuilder
+    def self.top_n_sql(table_name:, target_table_name:, primary_key:, foreign_key:, order_mode:, order_key:, condition:)
+      order_op = order_mode == :asc ? :< : :>
+      condition_sql = where_condition_to_sql condition
       %(
         SELECT *
         FROM (
@@ -49,18 +63,48 @@ class ActiveRecord::Relation
           "#{target_table_name}"."#{foreign_key}" = T.key AND
           (T.last_value IS NULL OR "#{target_table_name}"."#{order_key}" #{order_op} T.last_value)
         #{"WHERE #{condition_sql}" if condition_sql}
-        ORDER BY "#{target_table_name}"."#{order_key}" #{order_mode.to_s.upcase}
-      ),
-      {
-        primary_keys: loaded? ? map { |record| record[primary_key] } : pluck(primary_key),
-        offset: limit
-      }
-    ]).group_by { |record| record[foreign_key] }
+      )
+    end
+
+    def self.where_condition_to_sql(condition)
+      case condition
+      when String
+        condition
+      when Array
+        ActiveRecord::Base.send :sanitize_sql_array, condition
+      when Hash
+        condition.map { |key, value| kv_condition_to_sql key, value }.join ' AND '
+      end
+    end
+
+    def self.kv_condition_to_sql(key, value)
+      sql_binds = begin
+        case value
+        when NilClass
+          %("#{key}" IS NULL)
+        when Range
+          sql = value.exclude_end? ? %("#{key}" >= ? AND "#{key} < ?) : %("#{key}" BETWEEN ? AND ?)
+          [sql, value.begin, value.end]
+        when Enumerable
+          [%("#{key}" IN (?)), value.to_a]
+        else
+          [%("#{key}" IS ?), value]
+        end
+      end
+      ActiveRecord::Base.send :sanitize_sql_array, sql_binds
+    end
+  end
+end
+
+class ActiveRecord::Relation
+  def top_n_child_records(target_klass, option)
+    primary_keys = loaded? ? map { |o| o[primary_key] } : pluck(primary_key)
+    TopNRecords.top_n_records klass, primary_keys, target_klass, option
   end
 end
 
 User.first.post_ids # => [1, 3, 9, 10, 15, 18, 19]
-User.first.posts.top_n_child_records(Comment, 2, order: { created_at: :desc }, sql: ['id < ?', 16])
+User.first.posts.top_n_child_records(Comment, limit: 2, order: { created_at: :desc }, condition: { id: (1..16) })
 __END__
 {15=>
   [#<Comment:0x00007fe34f2718b8 id: 14, post_id: 15, user_id: 3>,
