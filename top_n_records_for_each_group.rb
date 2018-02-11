@@ -1,5 +1,5 @@
 class ActiveRecord::Relation
-  def each_limit_group target_klass, join: nil, order: nil, limit: 1, sql: nil
+  def top_n_child_records target_klass, limit, join: nil, order: nil, sql: nil
     primary_key = klass.primary_key
     if join.is_a? Hash
       raise unless order.size == 1
@@ -60,7 +60,7 @@ class ActiveRecord::Relation
 end
 
 User.first.post_ids # => [1, 3, 9, 10, 15, 18, 19]
-User.first.posts.each_limit_group(Comment, order: { created_at: :desc }, limit: 2, sql: ['id < ?', 16])
+User.first.posts.top_n_child_records(Comment, 2, order: { created_at: :desc }, sql: ['id < ?', 16])
 __END__
 {15=>
   [#<Comment:0x00007fe34f2718b8 id: 14, post_id: 15, user_id: 3>,
