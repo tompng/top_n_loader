@@ -1,18 +1,18 @@
 module TopNRecords
   def self.parse_order(klass, order)
-    case order
-    when Hash
-      unless order.size == 1 && %i[asc desc].include?(order.first.last)
-        raise ArgumentError, 'invalid order'
+    key, mode = begin
+      case order
+      when Hash
+        raise ArgumentError, 'invalid order' unless order.size == 1
+        order.first
+      when Symbol
+        [klass.primary_key, order]
+      when NilClass
+        [klass.primary_key, :asc]
       end
-      order.first
-    when Symbol
-      [order, :asc]
-    when NilClass
-      [klass.primary_key, :asc]
-    else
-      raise ArgumentError, 'invalid order'
     end
+    raise ArgumentError, 'invalid order' unless %i[asc desc].include? mode
+    [key, mode]
   end
 
   def self.load(klass, column, keys, limit:, order: nil, condition: nil)
@@ -29,12 +29,12 @@ module TopNRecords
       )
     )
     result = Hash.new { [] }.merge(records.group_by { |o| o[column] })
-    order_sub_key = klass.primary_key
+    primary_key = klass.primary_key
     result.transform_values do |grouped_records|
       existings, blanks = grouped_records.partition { |o| o[order_key] }
-      existings.sort_by! { |o| [o[order_key], o[order_sub_key]] }
-      blanks.sort_by! { |o| o[order_sub_key] }
-      ordered = existings + blanks
+      existings.sort_by! { |o| [o[order_key], o[primary_key]] }
+      blanks.sort_by! { |o| o[primary_key] }
+      ordered = blanks + existings
       ordered.reverse! if order_mode == :desc
       ordered.take limit
     end
