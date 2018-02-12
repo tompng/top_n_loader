@@ -127,7 +127,7 @@ module TopNRecords
   end
 end
 
-TopNRecords.load(Comment, :post_id, [1, 2, 3], limit: 2, order: { created_at: :desc }, condition: {id: (1..32)})
+TopNRecords.load(Comment, :post_id, [1, 2, 3], limit: 2, order: :desc, condition: {id: (1..32)})
 __END__
 {1=>
   [#<Comment:0x00007fa98763bd88 id: 19, post_id: 1 ... >,
