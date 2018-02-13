@@ -19,7 +19,7 @@ module TopNRecords
     order_key, order_mode = parse_order klass, order
     records = klass.find_by_sql(
       TopNRecords::SQLBuilder.top_n_sql(
-        table_name: klass.table_name,
+        klass: klass,
         group_column: column,
         group_keys: keys,
         limit: limit,
@@ -41,14 +41,21 @@ module TopNRecords
   end
 
   module SQLBuilder
-    def self.top_n_sql(table_name:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
+    def self.top_n_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
       order_op = order_mode == :asc ? :< : :>
       condition_sql = where_condition_to_sql condition
       group_key_table = value_table(:X, :group_key, group_keys)
+      table_name = klass.table_name
+      inheritance_column = klass.inheritance_column
+      if klass.has_attribute?(inheritance_column) && klass.base_class != klass
+        sti_names = [klass, *klass.descendants].map(&:sti_name).compact
+        sti_sql = where_condition_to_sql inheritance_column => sti_names
+        condition_sql = [condition_sql, sti_sql].compact.join ' AND '
+      end
       %(
         SELECT "#{table_name}".*
         FROM (
-          SELECT *,
+          SELECT group_key,
           (
             SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
             WHERE "#{table_name}"."#{group_column}" = X.group_key
@@ -102,6 +109,7 @@ module TopNRecords
     end
 
     def self.kv_condition_to_sql(key, value)
+      return "NOT (#{where_condition_to_sql(value)})" if key == :not
       sql_binds = begin
         case value
         when NilClass
@@ -112,8 +120,16 @@ module TopNRecords
           else
             [%("#{key}" BETWEEN ? AND ?), value.begin, value.end]
           end
+        when Hash
+          raise ArgumentError, '' unless value.keys == [:not]
+          "NOT (#{kv_condition_to_sql(key, value[:not])})"
         when Enumerable
-          [%("#{key}" IN (?)), value.to_a]
+          array = value.to_a
+          if array.include? nil
+            [%(("#{key}" IS NULL OR "#{key}" IN (?))), array.reject(&:nil?)]
+          else
+            [%("#{key}" IN (?)), array]
+          end
         else
           [%("#{key}" IS ?), value]
         end
