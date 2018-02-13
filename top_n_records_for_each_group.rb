@@ -1,4 +1,4 @@
-module TopNRecords
+module TopNLoader
   def self.parse_order(klass, order)
     key, mode = begin
       case order
@@ -28,8 +28,12 @@ module TopNRecords
         condition: condition
       )
     )
-    result = Hash.new { [] }.merge(records.group_by { |o| o[column] })
+    format_result records, column, limit, order_mode, order_key
+  end
+
+  def self._format_result(records, column, limit, order_mode, order_key)
     primary_key = klass.primary_key
+    result = Hash.new { [] }.merge(records.group_by { |o| o[column] })
     result.transform_values do |grouped_records|
       existings, blanks = grouped_records.partition { |o| o[order_key] }
       existings.sort_by! { |o| [o[order_key], o[primary_key]] }
@@ -41,17 +45,20 @@ module TopNRecords
   end
 
   module SQLBuilder
+    def self.condition_sql(klass, condition)
+      condition_sql = where_condition_to_sql condition
+      inheritance_column = klass.inheritance_column
+      return condition_sql unless klass.has_attribute?(inheritance_column) && klass.base_class != klass
+      sti_names = [klass, *klass.descendants].map(&:sti_name).compact
+      sti_sql = where_condition_to_sql inheritance_column => sti_names
+      [condition_sql, sti_sql].compact.join ' AND '
+    end
+
     def self.top_n_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
       order_op = order_mode == :asc ? :< : :>
-      condition_sql = where_condition_to_sql condition
       group_key_table = value_table(:X, :group_key, group_keys)
       table_name = klass.table_name
-      inheritance_column = klass.inheritance_column
-      if klass.has_attribute?(inheritance_column) && klass.base_class != klass
-        sti_names = [klass, *klass.descendants].map(&:sti_name).compact
-        sti_sql = where_condition_to_sql inheritance_column => sti_names
-        condition_sql = [condition_sql, sti_sql].compact.join ' AND '
-      end
+      sql = condition_sql klass, condition
       %(
         SELECT "#{table_name}".*
         FROM (
@@ -59,7 +66,7 @@ module TopNRecords
           (
             SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
             WHERE "#{table_name}"."#{group_column}" = X.group_key
-            #{"AND #{condition_sql}" if condition_sql}
+            #{"AND #{sql}" if sql}
             ORDER BY "#{table_name}"."#{order_key}" #{order_mode.to_s.upcase}
             LIMIT 1 OFFSET #{limit.to_i}
           ) AS last_value
@@ -71,7 +78,7 @@ module TopNRecords
             T.last_value IS NULL
             OR "#{table_name}"."#{order_key}" #{order_op} T.last_value
           )
-        #{"WHERE #{condition_sql}" if condition_sql}
+        #{"WHERE #{sql}" if sql}
       )
     end
 
@@ -143,7 +150,7 @@ module TopNRecords
   end
 end
 
-TopNRecords.load(Comment, :post_id, [1, 2, 3], limit: 2, order: :desc, condition: {id: (1..32)})
+TopNLoader.load(Comment, :post_id, [1, 2, 3], limit: 2, order: :desc, condition: {id: (1..32)})
 __END__
 {1=>
   [#<Comment:0x00007fa98763bd88 id: 19, post_id: 1 ... >,
