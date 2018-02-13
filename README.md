@@ -26,9 +26,15 @@ end
 ```
 
 ```ruby
+# Gemfile
 gem 'top_n_loader', github: 'tompng/top_n_loader'
+
 TopNLoader.load(YourModel, group_column, group_values, limit:, order: nil, condition: nil)
 # limit: >=0
 # order: :asc, :desc, {order_column: (:asc or :desc)}
 # condition: 'name is null', ['name = ?', 'jack'], { age: (1..10), name: { not: 'jack' }}
+
+# 以下とほぼ同じ結果を返します(conditionとorderのフォーマットが若干違う)
+records = YourModel.where(condition).where(group_column => group_values).order(order)
+records.group_by(&group_column).transform_values { |list| list.take(limit) }
 ```
