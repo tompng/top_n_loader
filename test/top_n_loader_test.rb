@@ -28,7 +28,8 @@ class TopNLoaderTest < Minitest::Test
       records = klass.where(column => values).order(ar_order).to_a
       result = TopNLoader.load klass, column, values, order: order, limit: limit
       expected = expected_result records, column, limit
-      assert_equal(result, expected, "#{klass}, #{column}: #{values.inspect}, order: #{order}, limit: #{limit}")
+      message = "#{klass}, #{column}: #{values.inspect}, order: #{order}, limit: #{limit}"
+      assert_equal result, expected, message
     end
   end
 
@@ -51,7 +52,7 @@ class TopNLoaderTest < Minitest::Test
     expected = expected_result(records, :int, 32)
     result1 = TopNLoader.load Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition1
     result2 = TopNLoader.load Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition2
-    assert_equal(result1, result2)
-    assert_equal(expected, result1)
+    assert_equal result1, result2
+    assert_equal expected, result1
   end
 end

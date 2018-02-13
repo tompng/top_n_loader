@@ -1,23 +1,26 @@
 require 'top_n_loader/version'
-require 'activerecord'
+require 'active_record'
 require 'top_n_loader/sql_builder'
 
 module TopNLoader
   class << self
     def load(klass, column, keys, limit:, order: nil, condition: nil)
       order_key, order_mode = parse_order klass, order
+      options = {
+        klass: klass,
+        group_column: column,
+        limit: limit,
+        order_mode: order_mode,
+        order_key: order_key
+      }
       records = klass.find_by_sql(
-        TopNRecords::SQLBuilder.top_n_sql(
-          klass: klass,
-          group_column: column,
+        SQLBuilder.top_n_sql(
           group_keys: keys,
-          limit: limit,
-          order_mode: order_mode,
-          order_key: order_key,
-          condition: condition
+          condition: condition,
+          **options
         )
       )
-      format_result records, column, limit, order_mode, order_key
+      format_result records, options
     end
 
     private
@@ -38,9 +41,9 @@ module TopNLoader
       [key, mode]
     end
 
-    def format_result(records, column, limit, order_mode, order_key)
+    def format_result(records, klass:, group_column:, limit:, order_mode:, order_key:)
       primary_key = klass.primary_key
-      result = Hash.new { [] }.merge(records.group_by { |o| o[column] })
+      result = Hash.new { [] }.merge(records.group_by { |o| o[group_column] })
       result.transform_values do |grouped_records|
         existings, blanks = grouped_records.partition { |o| o[order_key] }
         existings.sort_by! { |o| [o[order_key], o[primary_key]] }

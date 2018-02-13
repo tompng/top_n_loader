@@ -9,28 +9,34 @@ module TopNLoader::SQLBuilder
   end
 
   def self.top_n_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
-    order_op = order_mode == :asc ? :< : :>
+    order_op = order_mode == :asc ? :<= : :>=
     group_key_table = value_table(:X, :group_key, group_keys)
     table_name = klass.table_name
     sql = condition_sql klass, condition
+    join_cond = %("#{table_name}"."#{group_column}" = %{JOIN_TABLE}.group_key)
+    if group_keys.include? nil
+      nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND %{JOIN_TABLE}.group_key IS NULL))
+      join_cond = %((#{join_cond} OR #{nil_join_cond}))
+    end
     %(
       SELECT "#{table_name}".*
       FROM (
         SELECT group_key,
         (
           SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
-          WHERE "#{table_name}"."#{group_column}" = X.group_key
+          WHERE #{join_cond % { JOIN_TABLE: :X }}
           #{"AND #{sql}" if sql}
           ORDER BY "#{table_name}"."#{order_key}" #{order_mode.to_s.upcase}
-          LIMIT 1 OFFSET #{limit.to_i}
+          LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value
         FROM #{group_key_table}
       ) T
       INNER JOIN "#{table_name}" ON
-        "#{table_name}"."#{group_column}" = T.group_key
+        #{join_cond % { JOIN_TABLE: :T }}
         AND (
           T.last_value IS NULL
           OR "#{table_name}"."#{order_key}" #{order_op} T.last_value
+          OR "#{table_name}"."#{order_key}" is NULL
         )
       #{"WHERE #{sql}" if sql}
     )
@@ -46,7 +52,7 @@ module TopNLoader::SQLBuilder
 
   def self.union_value_table(table, column, values)
     sanitize_sql_array [
-      "(SELECT 1 AS #{column}#{' UNION SELECT ?' * values.size}) AS #{table}",
+      "(SELECT ? AS #{column}#{' UNION SELECT ?' * (values.size - 1)}) AS #{table}",
       *values
     ]
   end
