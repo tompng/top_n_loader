@@ -1,7 +1,7 @@
 require "test_helper"
 
 class TopNLoaderTest < Minitest::Test
-  def test_normal
+  def test_version
     refute_nil ::TopNLoader::VERSION
   end
 
@@ -35,7 +35,7 @@ class TopNLoaderTest < Minitest::Test
     ]
     limits = [2, 32]
     classes.product column_values_list, orders, limits do |klass, (column, values), (order, ar_order), limit|
-      records = klass.where(column => values).order(ar_order).to_a
+      records = klass.where(column => values).order(ar_order)
       result = TopNLoader.load klass, column, values, order: order, limit: limit
       expected = expected_result records, column, limit
       message = "#{klass}, #{column}: #{values.inspect}, order: #{order}, limit: #{limit}"
