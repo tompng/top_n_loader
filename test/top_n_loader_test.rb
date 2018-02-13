@@ -48,7 +48,7 @@ class TopNLoaderTest < Minitest::Test
     top_n_condition1 = { string: string_include, id: { not: id_exclude }, not: { date: date_not } }
     top_n_condition2 = { string: string_include, not: { id: id_exclude }, date: { not: date_not } }
     records = Normal.where(string: string_include).where.not(id: id_exclude).where.not(date: date_not).order(id: :desc)
-    expected = expected_result(records, :int, ints, 32)
+    expected = expected_result(records, :int, 32)
     result1 = TopNLoader.load Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition1
     result2 = TopNLoader.load Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition2
     assert_equal(result1, result2)
