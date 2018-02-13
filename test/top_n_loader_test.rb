@@ -6,7 +6,7 @@ class TopNLoaderTest < Minitest::Test
   end
 
   def expected_result records, key, limit
-    records.group_by(&key).transform_values { |records| records.take(limit) }
+    records.group_by(&key).transform_values { |list| list.take(limit) }
   end
 
   def test_valid_seed
@@ -44,8 +44,14 @@ class TopNLoaderTest < Minitest::Test
   end
 
   def test_errors
+    TopNLoader.load Normal, :int, [1, 2, 3], limit: 3
     TopNLoader.load Normal, :int, [1, 2, 3], order: :desc, limit: 3
     TopNLoader.load Normal, :int, [1, 2, 3], order: { string: :desc }, limit: 3
+    assert_equal TopNLoader.load(Normal, :int, [], limit: 3), {}
+    assert_equal TopNLoader.load(Normal, :int, [1, 2, 3], limit: 0), {}
+    assert_equal TopNLoader.load(Normal, :int, [1, 2, 3], limit: 9)[4], []
+    assert_equal TopNLoader.load(Normal, :int, [1, 2, 3], limit: 3)[4], []
+    assert_raises(ArgumentError) { TopNLoader.load Normal, :int, [1, 2, 3], limit: -1 }
     assert_raises(ArgumentError) { TopNLoader.load Normal, :int, [1, 2, 3], order: :desk, limit: 3 }
     assert_raises(ArgumentError) { TopNLoader.load Normal, :int, [1, 2, 3], order: { string: :desk }, limit: 3 }
     assert_raises(ArgumentError) { TopNLoader.load Normal, :int, [1, 2, 3], order: :desc }

@@ -5,6 +5,8 @@ require 'top_n_loader/sql_builder'
 module TopNLoader
   class << self
     def load(klass, column, keys, limit:, order: nil, condition: nil)
+      raise ArgumentError, 'negative limit' if limit < 0
+      return Hash.new { [] } if keys.empty? || limit.zero?
       order_key, order_mode = parse_order klass, order
       options = {
         klass: klass,
@@ -43,8 +45,8 @@ module TopNLoader
 
     def format_result(records, klass:, group_column:, limit:, order_mode:, order_key:)
       primary_key = klass.primary_key
-      result = Hash.new { [] }.merge(records.group_by { |o| o[group_column] })
-      result.transform_values do |grouped_records|
+      result = Hash.new { [] }.update(records.group_by { |o| o[group_column] })
+      result.transform_values! do |grouped_records|
         existings, blanks = grouped_records.partition { |o| o[order_key] }
         existings.sort_by! { |o| [o[order_key], o[primary_key]] }
         blanks.sort_by! { |o| o[primary_key] }
