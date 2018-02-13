@@ -9,6 +9,16 @@ class TopNLoaderTest < Minitest::Test
     records.group_by(&key).transform_values { |records| records.take(limit) }
   end
 
+  def test_valid_seed
+    assert_equal Normal.count, 100
+    assert_equal Sti.count, 100
+    DB::VALUES.each do |key, values|
+      assert_equal Normal.count, Normal.where(key => values).count
+      assert_equal Sti.count, Sti.where(key => values).count
+    end
+    assert_equal Sti.count, Sti.where(type: DB::TYPES).count
+  end
+
   def test_combinations
     classes = [Normal, Sti, StiA, StiB, StiAA, StiAB, StiAAB]
     column_values_list = DB::VALUES.flat_map do |key, values|
@@ -23,7 +33,7 @@ class TopNLoaderTest < Minitest::Test
       [{ string: :asc }, { string: :asc, id: :asc }],
       [{ string: :desc }, { string: :desc, id: :desc }]
     ]
-    limits = [8, 32]
+    limits = [2, 32]
     classes.product column_values_list, orders, limits do |klass, (column, values), (order, ar_order), limit|
       records = klass.where(column => values).order(ar_order).to_a
       result = TopNLoader.load klass, column, values, order: order, limit: limit
@@ -54,5 +64,6 @@ class TopNLoaderTest < Minitest::Test
     result2 = TopNLoader.load Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition2
     assert_equal result1, result2
     assert_equal expected, result1
+    assert_equal expected, result2
   end
 end

@@ -98,7 +98,7 @@ module TopNLoader::SQLBuilder
           [%("#{key}" IN (?)), array]
         end
       else
-        [%("#{key}" IS ?), value]
+        [%("#{key}" = ?), value]
       end
     end
     sanitize_sql_array sql_binds
