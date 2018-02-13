@@ -8,7 +8,7 @@ class StiB < Sti; end
 class StiAA < StiA; end
 class StiAB < StiA; end
 class StiAAB < StiAA; end
-Class.new(StiTypeA)
+Class.new(StiA)
 
 module DB
   DATABASE_CONFIG = {
@@ -40,16 +40,17 @@ module DB
     end
   end
 
+  VALUES = {
+    string: %w[hello world ruby active record] + [nil],
+    int: [nil, *(1..10)],
+    date: (1..12).map { |i| Date.new 2000, i, rand(1..28) } + [nil]
+  }
+  TYPES = %w[StiA StiB StiAA StiAB StiAAB] + [nil]
+
   def self.seed
-    values = {
-      string: %w[hello world ruby active record] + [nil],
-      int: 10.times.to_a + [nil],
-      date: 12.times.map { |i| Date.new 2000, i, rand(28) } + [nil]
-    }
-    types = %w[StiA StiB StiAA StiAB StiAAB] + [nil]
     100.times do
-      Normal.create values.transform_values(&:sample)
-      Sti.create type: types.sample, **values.transform_values(&:sample)
+      Normal.create VALUES.transform_values(&:sample)
+      Sti.create type: TYPES.sample, **VALUES.transform_values(&:sample)
     end
   end
 end
