@@ -1,8 +1,25 @@
 require 'benchmark'
 require 'active_record'
 
-class Normal < ActiveRecord::Base; end
-class Sti < ActiveRecord::Base; end
+
+class Foo < ActiveRecord::Base
+  has_many :bars, foreign_key: :int
+  has_many :normals, through: :bars
+  has_many :stis, through: :bars
+end
+class Bar < ActiveRecord::Base
+  belongs_to :foo, foreign_key: :int, required: false
+  has_many :normals, foreign_key: :int
+  has_many :stis, foreign_key: :int
+end
+class Normal < ActiveRecord::Base
+  belongs_to :bar, foreign_key: :int, required: false
+  has_one :foo, through: :bar
+end
+class Sti < ActiveRecord::Base
+  belongs_to :bar, foreign_key: :int, required: false
+  has_one :foo, through: :bar
+end
 class StiA < Sti; end
 class StiB < Sti; end
 class StiAA < StiA; end
@@ -24,6 +41,15 @@ module DB
     File.unlink DATABASE_CONFIG[:database] if File.exist? DATABASE_CONFIG[:database]
     ActiveRecord::Base.clear_all_connections!
     ActiveRecord::Migration::Current.class_eval do
+      create_table :foos do |t|
+        t.string :string
+        t.timestamps
+      end
+      create_table :bars do |t|
+        t.string :string
+        t.integer :int
+        t.timestamps
+      end
       create_table :normals do |t|
         t.string :string
         t.integer :int
@@ -40,6 +66,7 @@ module DB
     end
   end
 
+  srand 1
   VALUES = {
     string: %w[hello world ruby active record] + [nil],
     int: [nil, *(1..10)],
@@ -48,6 +75,8 @@ module DB
   TYPES = %w[StiA StiB StiAA StiAB StiAAB] + [nil]
 
   def self.seed
+    4.times { Foo.create string: VALUES[:string].sample }
+    10.times { Bar.create string: VALUES[:string].sample, int: rand(1..4) }
     100.times do
       Normal.create VALUES.transform_values(&:sample)
       Sti.create type: TYPES.sample, **VALUES.transform_values(&:sample)
