@@ -6,17 +6,36 @@ class TopNLoaderTest < Minitest::Test
   end
 
   def expected_result records, key, limit
-    records.group_by(&key).transform_values { |list| list.take(limit) }
+    records.group_by(&key).map do |key, list|
+      [
+        key.is_a?(ActiveRecord::Base) ? key[key.class.primary_key] : key,
+        list.take(limit)
+      ]
+    end.to_h
   end
 
   def test_valid_seed
     assert_equal Normal.count, 100
     assert_equal Sti.count, 100
-    DB::VALUES.each do |key, values|
+    DB::VALUES.to_a.drop(2).take(1).each do |key, values|
       assert_equal Normal.count, Normal.where(key => values).count
       assert_equal Sti.count, Sti.where(key => values).count
     end
     assert_equal Sti.count, Sti.where(type: DB::TYPES).count
+  end
+
+  def test_reflections
+    records = Normal.includes(:bar).where(bars: {id: [1,2,3]}).order(id: :asc)
+    result = TopNLoader.load Normal, :bar, [1,2,3], limit: 8
+    expected = expected_result records, :bar, 8
+    assert_equal result, expected, message
+  end
+
+  def test_through_reflections
+    records = Normal.includes(:foo).where(foos: {id: [1,2,3]}).order(id: :asc)
+    result = TopNLoader.load Normal, :foo, [1,2,3], limit: 8
+    expected = expected_result records, :foo, 8
+    assert_equal result, expected, message
   end
 
   def test_combinations

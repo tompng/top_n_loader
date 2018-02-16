@@ -45,7 +45,11 @@ module TopNLoader
 
     def format_result(records, klass:, group_column:, limit:, order_mode:, order_key:)
       primary_key = klass.primary_key
-      result = Hash.new { [] }.update(records.group_by { |o| o[group_column] })
+      type = klass.attribute_types[group_column.to_s]
+      result = records.group_by do |record|
+        key = record.top_n_group_key
+        type ? type.cast(key) : key unless key.nil?
+      end
       result.transform_values! do |grouped_records|
         existings, blanks = grouped_records.partition { |o| o[order_key] }
         existings.sort_by! { |o| [o[order_key], o[primary_key]] }
@@ -54,6 +58,7 @@ module TopNLoader
         ordered.reverse! if order_mode == :desc
         ordered.take limit
       end
+      Hash.new { [] }.update result
     end
   end
 end
