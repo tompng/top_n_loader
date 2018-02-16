@@ -1,7 +1,6 @@
 require 'benchmark'
 require 'active_record'
 
-
 class Foo < ActiveRecord::Base
   has_many :bars, foreign_key: :int
   has_many :normals, through: :bars
