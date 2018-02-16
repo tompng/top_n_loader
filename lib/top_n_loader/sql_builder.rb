@@ -18,7 +18,6 @@ module TopNLoader::SQLBuilder
       if group_keys.include? nil
         nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND %{JOIN_TABLE}.group_key IS NULL))
         join_cond = %((#{join_cond} OR #{nil_join_cond}))
-        join_cond2 = join_cond
       end
     else
       ref = klass.reflections[group_column.to_s]
@@ -28,7 +27,7 @@ module TopNLoader::SQLBuilder
     end
     %(
       SELECT "#{table_name}".*, group_key as top_n_group_key
-      FROM "normals"
+      FROM "#{table_name}"
       #{join_sql}
       INNER JOIN
       (

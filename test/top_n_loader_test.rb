@@ -37,7 +37,7 @@ class TopNLoaderTest < Minitest::Test
     expected = expected_result records, :foo, 8
     assert_equal result, expected, message
   end
-if false # aaa
+
   def test_combinations
     classes = [Normal, Sti, StiA, StiB, StiAA, StiAB, StiAAB]
     column_values_list = DB::VALUES.flat_map do |key, values|
@@ -91,5 +91,4 @@ if false # aaa
     assert_equal expected, result1
     assert_equal expected, result2
   end
-end # aaa
 end
