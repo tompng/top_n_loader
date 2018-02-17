@@ -43,28 +43,19 @@ module TopNLoader::SQLBuilder
     group_key_table = value_table(:T, :group_key, group_keys)
     table_name = klass.table_name
     sql = condition_sql klass, condition
-    if klass.has_attribute? group_column
-      join_cond = %("#{table_name}"."#{group_column}" = T.group_key)
-      if group_keys.include? nil
-        nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND T.group_key IS NULL))
-        join_cond = %((#{join_cond} OR #{nil_join_cond}))
-      end
-    else
-      ref = klass.reflections[group_column.to_s]
-      join_sql = klass.joins(group_column).to_sql.match(/^SELECT "[^"]+"\.\* FROM "[^"]+" (.+)$/)[1]
-      join_cond = %("#{ref.klass.table_name}"."#{ref.klass.primary_key}" = T.group_key)
-      raise if group_keys.include? nil
+    join_cond = %("#{table_name}"."#{group_column}" = T.group_key)
+    if group_keys.include? nil
+      nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND T.group_key IS NULL))
+      join_cond = %((#{join_cond} OR #{nil_join_cond}))
     end
     %(
       SELECT "#{table_name}".*, group_key as top_n_group_key
       FROM "#{table_name}"
-      #{join_sql}
       INNER JOIN
       (
         SELECT group_key,
         (
           SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
-          #{join_sql if join_sql}
           WHERE #{join_cond}
           #{"AND #{sql}" if sql}
           ORDER BY "#{table_name}"."#{order_key}" #{order_mode.to_s.upcase}
