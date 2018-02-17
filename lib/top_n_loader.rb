@@ -49,7 +49,8 @@ module TopNLoader
           [klass.primary_key, :asc]
         end
       end
-      raise ArgumentError, 'invalid order' unless %i[asc desc].include? mode
+      raise ArgumentError, "invalid order key: #{key}" unless klass.has_attribute? key
+      raise ArgumentError, "invalid order mode: #{mode.inspect}" unless %i[asc desc].include? mode
       [key, mode]
     end
 
