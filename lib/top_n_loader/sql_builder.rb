@@ -18,13 +18,13 @@ module TopNLoader::SQLBuilder
       #{joins}
       INNER JOIN
       (
-        SELECT T.id as top_n_group_key,
+        SELECT T."#{klass.primary_key}" as top_n_group_key,
         (
           SELECT "#{target_table}"."#{order_key}"
           #{joins}
           WHERE "#{parent_table}"."#{klass.primary_key}" = T."#{klass.primary_key}"
           ORDER BY "#{target_table}"."#{order_key}" #{order_mode.upcase}
-          LIMIT 1 OFFSET #{limit}
+          LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value
         FROM "#{parent_table}" as T where T."#{klass.primary_key}" in (?)
       ) T
@@ -40,20 +40,20 @@ module TopNLoader::SQLBuilder
 
   def self.top_n_group_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
     order_op = order_mode == :asc ? :<= : :>=
-    group_key_table = value_table(:T, :group_key, group_keys)
+    group_key_table = value_table(:T, :top_n_group_key, group_keys)
     table_name = klass.table_name
     sql = condition_sql klass, condition
-    join_cond = %("#{table_name}"."#{group_column}" = T.group_key)
+    join_cond = %("#{table_name}"."#{group_column}" = T.top_n_group_key)
     if group_keys.include? nil
-      nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND T.group_key IS NULL))
+      nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND T.top_n_group_key IS NULL))
       join_cond = %((#{join_cond} OR #{nil_join_cond}))
     end
     %(
-      SELECT "#{table_name}".*, group_key as top_n_group_key
+      SELECT "#{table_name}".*, top_n_group_key
       FROM "#{table_name}"
       INNER JOIN
       (
-        SELECT group_key,
+        SELECT top_n_group_key,
         (
           SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
           WHERE #{join_cond}
