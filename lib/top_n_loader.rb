@@ -4,14 +4,14 @@ require 'top_n_loader/sql_builder'
 
 module TopNLoader
   class << self
-    def load_children(klass, ids, relation, limit:, order: nil)
+    def load_associations(base_klass, ids, relation, limit:, order: nil)
       raise ArgumentError, 'negative limit' if limit < 0
       return Hash.new { [] } if ids.empty? || limit.zero?
-      child_class = klass.reflections[relation.to_s].klass
-      order_option = { limit: limit, **parse_order(child_class, order) }
-      sql = SQLBuilder.top_n_child_sql klass, relation, order_option
-      records = child_class.find_by_sql([sql, ids])
-      format_result(records, klass: child_class, **order_option)
+      klass = base_klass.reflections[relation.to_s].klass
+      order_option = { limit: limit, **parse_order(klass, order) }
+      sql = SQLBuilder.top_n_association_sql base_klass, relation, order_option
+      records = klass.find_by_sql([sql, ids])
+      format_result(records, klass: klass, **order_option)
     end
 
     def load_groups(klass, column, keys, limit:, order: nil, condition: nil)

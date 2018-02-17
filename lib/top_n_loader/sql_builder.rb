@@ -8,7 +8,7 @@ module TopNLoader::SQLBuilder
     [condition_sql, sti_sql].compact.join ' AND '
   end
 
-  def self.top_n_child_sql(klass, relation, limit:, order_mode:, order_key:)
+  def self.top_n_association_sql(klass, relation, limit:, order_mode:, order_key:)
     parent_table = klass.table_name
     joins = klass.joins relation
     target_table = joins.join_sources.last.left.name

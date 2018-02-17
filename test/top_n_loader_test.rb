@@ -5,7 +5,7 @@ class TopNLoaderTest < Minitest::Test
     refute_nil ::TopNLoader::VERSION
   end
 
-  def expected_group_result(records, key, limit)
+  def expected_groups_result(records, key, limit)
     records.group_by(&key).map do |key, list|
       [
         key.is_a?(ActiveRecord::Base) ? key[key.class.primary_key] : key,
@@ -14,7 +14,7 @@ class TopNLoaderTest < Minitest::Test
     end.to_h
   end
 
-  def expected_children_result(klass, ids, relation, limit)
+  def expected_associations_result(klass, ids, relation, limit)
     klass.find(ids).map do |a|
       [a.id, a.send(relation).order(id: :asc).limit(limit)]
     end.reject { |_k, v| v.empty? }.to_h
@@ -33,27 +33,27 @@ class TopNLoaderTest < Minitest::Test
   def test_belongs_to_reflections
     %i[foo bar].each do |relation|
       expected = Normal.find(1, 2, 3).map { |n| [n.id, [n.send(relation)]]}.to_h
-      result = TopNLoader.load_children Normal, [1, 2, 3], relation, limit: 8
+      result = TopNLoader.load_associations Normal, [1, 2, 3], relation, limit: 8
       assert_equal result, expected, relation
     end
   end
 
   def test_has_many_reflections
     %i[bars normals stis stias large_normals].each do |relation|
-      expected = expected_children_result Foo, [1, 2, 3], relation, 8
-      result = TopNLoader.load_children Foo, [1, 2, 3], relation, limit: 8
+      expected = expected_associations_result Foo, [1, 2, 3], relation, 8
+      result = TopNLoader.load_associations Foo, [1, 2, 3], relation, limit: 8
       assert_equal result, expected, relation
     end
   end
 
   def test_self_join
-    expected = expected_children_result Bar, [1, 2, 3], :normal_same_id_foo_bars, 8
-    result = TopNLoader.load_children Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: 8
+    expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bars, 8
+    result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: 8
     assert_equal result, expected
   end
 
   def test_reflection_explain
-    sql = TopNLoader::SQLBuilder.top_n_child_sql Foo, :bars, limit: 3, order_mode: :asc, order_key: :id
+    sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, :bars, limit: 3, order_mode: :asc, order_key: :id
     explain = Bar.exec_explain [[sql, []]]
     assert !explain.include?('SCAN TABLE'), explain
   end
@@ -90,7 +90,7 @@ class TopNLoaderTest < Minitest::Test
     classes.product column_values_list, orders, limits do |klass, (column, values), (order, ar_order), limit|
       records = klass.where(column => values).order(ar_order)
       result = TopNLoader.load_groups klass, column, values, order: order, limit: limit
-      expected = expected_group_result records, column, limit
+      expected = expected_groups_result records, column, limit
       message = "#{klass}, #{column}: #{values.inspect}, order: #{order}, limit: #{limit}"
       assert_equal result, expected, message
     end
@@ -118,7 +118,7 @@ class TopNLoaderTest < Minitest::Test
     top_n_condition1 = { string: string_include, id: { not: id_exclude }, not: { date: date_not } }
     top_n_condition2 = { string: string_include, not: { id: id_exclude }, date: { not: date_not } }
     records = Normal.where(string: string_include).where.not(id: id_exclude).where.not(date: date_not).order(id: :desc)
-    expected = expected_group_result(records, :int, 32)
+    expected = expected_groups_result(records, :int, 32)
     result1 = TopNLoader.load_groups Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition1
     result2 = TopNLoader.load_groups Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition2
     assert_equal result1, result2
