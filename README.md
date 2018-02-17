@@ -33,13 +33,13 @@ gem 'top_n_loader', github: 'tompng/top_n_loader'
 ```
 
 ```ruby
-TopNLoader.load_childs(ParentModel, ids, relation, limit:, order: nil)
+TopNLoader.load_childs(ParentModel, ids, relation_name, limit:, order: nil)
 # limit: >=0
 # order: :asc, :desc, {order_column: (:asc or :desc)}
 
 # 以下と同じ結果を返します(orderのフォーマットが若干違う)
 records = ParentModel.find(ids).map do |record|
-  [record.id, record.send(relation).order(order).limit(limit)).to_a]
+  [record.id, record.send(relation_name).order(order).limit(limit)).to_a]
 end.to_h
 ```
 
