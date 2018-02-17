@@ -5,6 +5,8 @@ class Foo < ActiveRecord::Base
   has_many :bars, foreign_key: :int
   has_many :normals, through: :bars
   has_many :stis, through: :bars
+  has_many :stias, through: :bars, source: :stis, class_name: 'StiA'
+  has_many :large_normals, -> { where id: 50..100 }, through: :bars, source: :normals
 end
 class Bar < ActiveRecord::Base
   belongs_to :foo, foreign_key: :int, required: false
@@ -46,19 +48,19 @@ module DB
       end
       create_table :bars do |t|
         t.string :string
-        t.integer :int
+        t.integer :int, index: true
         t.timestamps
       end
       create_table :normals do |t|
         t.string :string
-        t.integer :int
+        t.integer :int, index: true
         t.date :date
         t.timestamps
       end
       create_table :stis do |t|
         t.string :type
         t.string :string
-        t.integer :int
+        t.integer :int, index: true
         t.date :date
         t.timestamps
       end

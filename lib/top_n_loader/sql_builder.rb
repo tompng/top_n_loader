@@ -8,47 +8,67 @@ module TopNLoader::SQLBuilder
     [condition_sql, sti_sql].compact.join ' AND '
   end
 
-  def self.top_n_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
-    order_op = order_mode == :asc ? :<= : :>=
-    group_key_table = value_table(:X, :group_key, group_keys)
-    table_name = klass.table_name
-    sql = condition_sql klass, condition
-    if klass.has_attribute? group_column
-      join_cond = %("#{table_name}"."#{group_column}" = %{JOIN_TABLE}.group_key)
-      if group_keys.include? nil
-        nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND %{JOIN_TABLE}.group_key IS NULL))
-        join_cond = %((#{join_cond} OR #{nil_join_cond}))
-      end
-    else
-      ref = klass.reflections[group_column.to_s]
-      join_sql = klass.joins(group_column).to_sql.match(/^SELECT "[^"]+"\.\* FROM "[^"]+" (.+)$/)[1]
-      join_cond = %("#{ref.klass.table_name}"."#{ref.klass.primary_key}" = %{JOIN_TABLE}.group_key)
-      raise if group_keys.include? nil
-    end
+  def self.top_n_child_sql(klass, relation, limit:, order_mode:, order_key:)
+    reflection = klass.reflections[relation.to_s]
+    parent_table = klass.table_name
+    target_table = reflection.klass.table_name
+    joins = klass.joins(relation).to_sql.match(/FROM.+/)[0]
     %(
-      SELECT "#{table_name}".*, group_key as top_n_group_key
-      FROM "#{table_name}"
-      #{join_sql}
+      SELECT "#{target_table}".*, top_n_group_key
+      #{joins}
       INNER JOIN
       (
-        SELECT group_key,
+        SELECT T."#{klass.primary_key}" as top_n_group_key,
+        (
+          SELECT "#{target_table}"."#{order_key}"
+          #{joins}
+          WHERE "#{parent_table}"."#{klass.primary_key}" = T."#{klass.primary_key}"
+          ORDER BY "#{target_table}"."#{order_key}" #{order_mode.upcase}
+          LIMIT 1 OFFSET #{limit.to_i - 1}
+        ) AS last_value
+        FROM "#{parent_table}" as T where T."#{klass.primary_key}" in (?)
+      ) T
+      ON "#{parent_table}"."#{klass.primary_key}" = T.top_n_group_key
+      AND (
+        T.last_value IS NULL
+        OR "#{target_table}"."#{order_key}" #{{asc: :<=, desc: :>=}[order_mode]} T.last_value
+        OR "#{target_table}"."#{order_key}" is NULL
+      )
+    )
+  end
+
+
+  def self.top_n_group_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
+    order_op = order_mode == :asc ? :<= : :>=
+    group_key_table = value_table(:T, :top_n_group_key, group_keys)
+    table_name = klass.table_name
+    sql = condition_sql klass, condition
+    join_cond = %("#{table_name}"."#{group_column}" = T.top_n_group_key)
+    if group_keys.include? nil
+      nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND T.top_n_group_key IS NULL))
+      join_cond = %((#{join_cond} OR #{nil_join_cond}))
+    end
+    %(
+      SELECT "#{table_name}".*, top_n_group_key
+      FROM "#{table_name}"
+      INNER JOIN
+      (
+        SELECT top_n_group_key,
         (
           SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
-          #{join_sql if join_sql}
-          WHERE #{join_cond % { JOIN_TABLE: :X }}
+          WHERE #{join_cond}
           #{"AND #{sql}" if sql}
           ORDER BY "#{table_name}"."#{order_key}" #{order_mode.to_s.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value
         FROM #{group_key_table}
       ) T
-      ON
-        #{join_cond % { JOIN_TABLE: :T }}
-        AND (
-          T.last_value IS NULL
-          OR "#{table_name}"."#{order_key}" #{order_op} T.last_value
-          OR "#{table_name}"."#{order_key}" is NULL
-        )
+      ON #{join_cond}
+      AND (
+        T.last_value IS NULL
+        OR "#{table_name}"."#{order_key}" #{order_op} T.last_value
+        OR "#{table_name}"."#{order_key}" is NULL
+      )
       #{"WHERE #{sql}" if sql}
     )
   end
