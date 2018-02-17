@@ -32,6 +32,12 @@ class TopNLoaderTest < Minitest::Test
     end
   end
 
+  def test_self_join
+    expected = Bar.where(id: [1,2,3]).map { |a| [a.id, a.normal_same_id_foo_bars.order(id: :asc).limit(8)] }.to_h
+    result = TopNLoader.load(Bar, [1,2,3], :normal_same_id_foo_bars, limit: 8)
+    assert_equal result, expected
+  end
+
   def test_reflection_explain
     sql = TopNLoader::SQLBuilder.top_n_child_sql(Foo, :bars, limit: 3, order_mode: :asc, order_key: :id)
     explain = Bar.exec_explain([[sql, []]])

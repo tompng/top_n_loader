@@ -12,10 +12,13 @@ class Bar < ActiveRecord::Base
   belongs_to :foo, foreign_key: :int, required: false
   has_many :normals, foreign_key: :int
   has_many :stis, foreign_key: :int
+  has_many :normal_same_id_foos, through: :normals, source: :foo_with_same_id
+  has_many :normal_same_id_foo_bars, through: :normal_same_id_foos, source: :bars
 end
 class Normal < ActiveRecord::Base
   belongs_to :bar, foreign_key: :int, required: false
   has_one :foo, through: :bar
+  has_one :foo_with_same_id, class_name: 'Foo', foreign_key: :id, primary_key: :id
 end
 class Sti < ActiveRecord::Base
   belongs_to :bar, foreign_key: :int, required: false
