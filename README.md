@@ -8,7 +8,7 @@ posts = Post.limit(10)
 render json: posts.map do |post|
   {
     title: post.title,
-    comments: post.comments.order(created_at: :desc).limit(5)
+    comments: post.comments.order(id: :desc).limit(5)
   }
 end
 ```
@@ -16,7 +16,7 @@ end
 1回のクエリでとってくれます
 ```ruby
 posts = Post.limit(10)
-top5s = TopNLoader.load_childs Post, posts.ids, :comments, order: { created_at: :desc }, limit: 5
+top5s = TopNLoader.load_childs Post, posts.ids, :comments, order: :desc, limit: 5
 render json: posts.map do |post|
   {
     title: post.title,
@@ -24,6 +24,8 @@ render json: posts.map do |post|
   }
 end
 ```
+
+# Usage
 
 ```ruby
 # Gemfile
@@ -35,7 +37,7 @@ TopNLoader.load_childs(ParentModel, ids, relation, limit:, order: nil)
 # limit: >=0
 # order: :asc, :desc, {order_column: (:asc or :desc)}
 
-# 以下とほぼ同じ結果を返します
+# 以下と同じ結果を返します(orderのフォーマットが若干違う)
 records = ParentModel.find(ids).map do |record|
   [record.id, record.send(relation).order(order).limit(limit)).to_a]
 end.to_h
@@ -47,7 +49,7 @@ TopNLoader.load_group(YourModel, group_column, group_values, limit:, order: nil,
 # order: :asc, :desc, {order_column: (:asc or :desc)}
 # condition: 'name is null', ['name = ?', 'jack'], { age: (1..10), name: { not: 'jack' }}
 
-# 以下とほぼ同じ結果を返します(conditionとorderのフォーマットが若干違う)
+# 以下と同じ結果を返します(conditionとorderのフォーマットが若干違う)
 records = YourModel.where(condition).where(group_column => group_values).order(order)
 records.group_by(&group_column).transform_values { |list| list.take(limit) }
 ```
