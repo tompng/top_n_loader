@@ -24,18 +24,26 @@ class TopNLoaderTest < Minitest::Test
     assert_equal Sti.count, Sti.where(type: DB::TYPES).count
   end
 
-  def test_reflections
+  def test_parent_reflections
     records = Normal.includes(:bar).where(bars: {id: [1,2,3]}).order(id: :asc)
     result = TopNLoader.load_groups Normal, :bar, [1,2,3], limit: 8
     expected = expected_result records, :bar, 8
-    assert_equal result, expected, message
+    assert_equal result, expected
   end
 
-  def test_through_reflections
+  def test_parent_through_reflections
     records = Normal.includes(:foo).where(foos: {id: [1,2,3]}).order(id: :asc)
     result = TopNLoader.load_groups Normal, :foo, [1,2,3], limit: 8
     expected = expected_result records, :foo, 8
-    assert_equal result, expected, message
+    assert_equal result, expected
+  end
+
+  def test_child_reflections
+    %i[bars normals stis stias large_normals].each do |relation|
+      expected = Foo.where(id: [1,2,3]).map {|a|[a.id, a.send(relation).order(id: :asc).limit(8)]}.to_h
+      result = TopNLoader.load_childs Foo, [1,2,3], relation, limit: 8
+      assert_equal result, expected
+    end
   end
 
   def test_combinations
