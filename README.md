@@ -39,7 +39,7 @@ TopNLoader.load_associations(ParentModel, ids, relation_name, limit:, order: nil
 
 # 以下と同じ結果を返します(orderのフォーマットが若干違う)
 records = ParentModel.find(ids).map do |record|
-  [record.id, record.send(relation_name).order(order).limit(limit)).to_a]
+  [record.id, record.send(relation_name).order(order).take(limit)]
 end.to_h
 ```
 
