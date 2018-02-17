@@ -4,7 +4,7 @@ require 'top_n_loader/sql_builder'
 
 module TopNLoader
   class << self
-    def load_childs(klass, ids, relation, limit:, order: nil)
+    def load_children(klass, ids, relation, limit:, order: nil)
       raise ArgumentError, 'negative limit' if limit < 0
       return Hash.new { [] } if ids.empty? || limit.zero?
       child_class = klass.reflections[relation.to_s].klass

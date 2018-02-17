@@ -27,14 +27,14 @@ class TopNLoaderTest < Minitest::Test
   def test_reflections
     %i[bars normals stis stias large_normals].each do |relation|
       expected = Foo.where(id: [1,2,3]).map { |a| [a.id, a.send(relation).order(id: :asc).limit(8)] }.to_h
-      result = TopNLoader.load_childs Foo, [1,2,3], relation, limit: 8
+      result = TopNLoader.load_children Foo, [1,2,3], relation, limit: 8
       assert_equal result, expected
     end
   end
 
   def test_self_join
     expected = Bar.where(id: [1,2,3]).map { |a| [a.id, a.normal_same_id_foo_bars.order(id: :asc).limit(8)] }.to_h
-    result = TopNLoader.load(Bar, [1,2,3], :normal_same_id_foo_bars, limit: 8)
+    result = TopNLoader.load_children(Bar, [1,2,3], :normal_same_id_foo_bars, limit: 8)
     assert_equal result, expected
   end
 

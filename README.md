@@ -16,7 +16,7 @@ end
 1回のクエリでとってくれます
 ```ruby
 posts = Post.limit(10)
-top5s = TopNLoader.load_childs Post, posts.ids, :comments, order: :desc, limit: 5
+top5s = TopNLoader.load_children Post, posts.ids, :comments, order: :desc, limit: 5
 render json: posts.map do |post|
   {
     title: post.title,
@@ -33,7 +33,7 @@ gem 'top_n_loader', github: 'tompng/top_n_loader'
 ```
 
 ```ruby
-TopNLoader.load_childs(ParentModel, ids, relation_name, limit:, order: nil)
+TopNLoader.load_children(ParentModel, ids, relation_name, limit:, order: nil)
 # limit: >=0
 # order: :asc, :desc, {order_column: (:asc or :desc)}
 
