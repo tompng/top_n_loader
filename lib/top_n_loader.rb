@@ -7,8 +7,7 @@ module TopNLoader
     def load_childs(klass, ids, relation, limit:, order: nil)
       raise ArgumentError, 'negative limit' if limit < 0
       child_class = klass.reflections[relation.to_s].klass
-      order_key, order_mode = parse_order child_class, order
-      order_option = { limit: limit, order_mode: order_mode, order_key: order_key }
+      order_option = { limit: limit, **parse_order(child_class, order) }
       sql = SQLBuilder.top_n_child_sql klass, relation, order_option
       records = child_class.find_by_sql([sql, ids])
       format_result(records, klass: child_class, **order_option)
@@ -17,13 +16,11 @@ module TopNLoader
     def load_groups(klass, column, keys, limit:, order: nil, condition: nil)
       raise ArgumentError, 'negative limit' if limit < 0
       return Hash.new { [] } if keys.empty? || limit.zero?
-      order_key, order_mode = parse_order klass, order
       options = {
         klass: klass,
         group_column: column,
         limit: limit,
-        order_mode: order_mode,
-        order_key: order_key
+        **parse_order(klass, order)
       }
       records = klass.find_by_sql(
         SQLBuilder.top_n_group_sql(
@@ -51,7 +48,7 @@ module TopNLoader
       end
       raise ArgumentError, "invalid order key: #{key}" unless klass.has_attribute? key
       raise ArgumentError, "invalid order mode: #{mode.inspect}" unless %i[asc desc].include? mode
-      [key, mode]
+      { order_key: key, order_mode: mode }
     end
 
     def format_result(records, klass:, group_column: nil, limit:, order_mode:, order_key:)
