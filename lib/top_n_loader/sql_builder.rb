@@ -9,19 +9,19 @@ module TopNLoader::SQLBuilder
   end
 
   def self.top_n_child_sql(klass, relation, limit:, order_mode:, order_key:)
-    reflection = klass.reflections[relation.to_s]
     parent_table = klass.table_name
-    target_table = reflection.klass.table_name
-    joins = klass.joins(relation).to_sql.match(/FROM.+/)[0]
+    joins = klass.joins relation
+    target_table = joins.join_sources.last.left.name
+    join_sql = joins.to_sql.match(/FROM.+/)[0]
     %(
       SELECT "#{target_table}".*, top_n_group_key
-      #{joins}
+      #{join_sql}
       INNER JOIN
       (
         SELECT T."#{klass.primary_key}" as top_n_group_key,
         (
           SELECT "#{target_table}"."#{order_key}"
-          #{joins}
+          #{join_sql}
           WHERE "#{parent_table}"."#{klass.primary_key}" = T."#{klass.primary_key}"
           ORDER BY "#{target_table}"."#{order_key}" #{order_mode.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
