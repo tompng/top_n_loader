@@ -24,9 +24,9 @@ class TopNLoaderTest < Minitest::Test
     assert_equal Sti.count, Sti.where(type: DB::TYPES).count
   end
 
-  def test_child_reflections
+  def test_reflections
     %i[bars normals stis stias large_normals].each do |relation|
-      expected = Foo.where(id: [1,2,3]).map {|a|[a.id, a.send(relation).order(id: :asc).limit(8)]}.to_h
+      expected = Foo.where(id: [1,2,3]).map { |a| [a.id, a.send(relation).order(id: :asc).limit(8)] }.to_h
       result = TopNLoader.load_childs Foo, [1,2,3], relation, limit: 8
       assert_equal result, expected
     end
