@@ -32,6 +32,26 @@ class TopNLoaderTest < Minitest::Test
     end
   end
 
+  def test_reflection_explain
+    sql = TopNLoader::SQLBuilder.top_n_child_sql(Foo, :bars, limit: 3, order_mode: :asc, order_key: :id)
+    explain = Bar.exec_explain([[sql, []]])
+    assert !explain.include?('SCAN TABLE'), explain
+  end
+
+  def test_group_explain
+    sql = TopNLoader::SQLBuilder.top_n_group_sql(
+      klass: Normal,
+      group_column: :int,
+      group_keys: [1, 2, 3],
+      condition: nil,
+      limit: 3,
+      order_mode: :asc,
+      order_key: :id
+    )
+    explain = Normal.exec_explain([[sql, []]])
+    assert !explain.include?('SCAN TABLE'), explain
+  end
+
   def test_combinations
     classes = [Normal, Sti, StiA, StiB, StiAA, StiAB, StiAAB]
     column_values_list = DB::VALUES.flat_map do |key, values|
