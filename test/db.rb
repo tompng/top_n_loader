@@ -46,19 +46,19 @@ module DB
       end
       create_table :bars do |t|
         t.string :string
-        t.integer :int
+        t.integer :int, index: true
         t.timestamps
       end
       create_table :normals do |t|
         t.string :string
-        t.integer :int
+        t.integer :int, index: true
         t.date :date
         t.timestamps
       end
       create_table :stis do |t|
         t.string :type
         t.string :string
-        t.integer :int
+        t.integer :int, index: true
         t.date :date
         t.timestamps
       end
