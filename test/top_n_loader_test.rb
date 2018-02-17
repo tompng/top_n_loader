@@ -30,11 +30,19 @@ class TopNLoaderTest < Minitest::Test
     assert_equal Sti.count, Sti.where(type: DB::TYPES).count
   end
 
-  def test_reflections
+  def test_belongs_to_reflections
+    %i[foo bar].each do |relation|
+      expected = Normal.find(1, 2, 3).map { |n| [n.id, [n.send(relation)]]}.to_h
+      result = TopNLoader.load_children Normal, [1, 2, 3], relation, limit: 8
+      assert_equal result, expected, relation
+    end
+  end
+
+  def test_has_many_reflections
     %i[bars normals stis stias large_normals].each do |relation|
       expected = expected_children_result Foo, [1, 2, 3], relation, 8
-      result = TopNLoader.load_children Foo, [1,2,3], relation, limit: 8
-      assert_equal result, expected
+      result = TopNLoader.load_children Foo, [1, 2, 3], relation, limit: 8
+      assert_equal result, expected, relation
     end
   end
 
