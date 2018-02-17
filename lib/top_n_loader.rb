@@ -5,6 +5,7 @@ require 'top_n_loader/sql_builder'
 module TopNLoader
   class << self
     def load_childs(klass, ids, relation, limit:, order: nil)
+      raise ArgumentError, 'negative limit' if limit < 0
       child_class = klass.reflections[relation.to_s].klass
       order_key, order_mode = parse_order child_class, order
       order_option = { limit: limit, order_mode: order_mode, order_key: order_key }
