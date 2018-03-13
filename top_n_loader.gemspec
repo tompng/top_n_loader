@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "activerecord"
 
-  %w[bundler rake minitest sqlite3 pry].each do |gem_name|
+  %w[bundler rake minitest sqlite3 pry simplecov].each do |gem_name|
     spec.add_development_dependency gem_name
   end
 end
