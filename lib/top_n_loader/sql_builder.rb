@@ -14,25 +14,25 @@ module TopNLoader::SQLBuilder
     target_table = joins.join_sources.last.left.name
     join_sql = joins.to_sql.match(/FROM.+/)[0]
     %(
-      SELECT "#{target_table}".*, top_n_group_key
+      SELECT #{qt target_table}.*, top_n_group_key
       #{join_sql}
       INNER JOIN
       (
-        SELECT T."#{klass.primary_key}" as top_n_group_key,
+        SELECT T.#{q klass.primary_key} as top_n_group_key,
         (
-          SELECT "#{target_table}"."#{order_key}"
+          SELECT #{qt target_table}.#{q order_key}
           #{join_sql}
-          WHERE "#{parent_table}"."#{klass.primary_key}" = T."#{klass.primary_key}"
-          ORDER BY "#{target_table}"."#{order_key}" #{order_mode.upcase}
+          WHERE #{qt parent_table}.#{q klass.primary_key} = T.#{q klass.primary_key}
+          ORDER BY #{qt target_table}.#{q order_key} #{order_mode.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value
-        FROM "#{parent_table}" as T where T."#{klass.primary_key}" in (?)
+        FROM #{qt parent_table} as T where T.#{q klass.primary_key} in (?)
       ) T
-      ON "#{parent_table}"."#{klass.primary_key}" = T.top_n_group_key
+      ON #{qt parent_table}.#{q klass.primary_key} = T.top_n_group_key
       AND (
         T.last_value IS NULL
-        OR "#{target_table}"."#{order_key}" #{{asc: :<=, desc: :>=}[order_mode]} T.last_value
-        OR "#{target_table}"."#{order_key}" is NULL
+        OR #{qt target_table}.#{q order_key} #{{ asc: :<=, desc: :>= }[order_mode]} T.last_value
+        OR #{qt target_table}.#{q order_key} is NULL
       )
     )
   end
@@ -43,22 +43,22 @@ module TopNLoader::SQLBuilder
     group_key_table = value_table(:T, :top_n_group_key, group_keys)
     table_name = klass.table_name
     sql = condition_sql klass, condition
-    join_cond = %("#{table_name}"."#{group_column}" = T.top_n_group_key)
+    join_cond = %(#{qt table_name}.#{q group_column} = T.top_n_group_key)
     if group_keys.include? nil
-      nil_join_cond = %(("#{table_name}"."#{group_column}" IS NULL AND T.top_n_group_key IS NULL))
+      nil_join_cond = %((#{qt table_name}.#{q group_column} IS NULL AND T.top_n_group_key IS NULL))
       join_cond = %((#{join_cond} OR #{nil_join_cond}))
     end
     %(
-      SELECT "#{table_name}".*, top_n_group_key
-      FROM "#{table_name}"
+      SELECT #{qt table_name}.*, top_n_group_key
+      FROM #{qt table_name}
       INNER JOIN
       (
         SELECT top_n_group_key,
         (
-          SELECT "#{table_name}"."#{order_key}" FROM "#{table_name}"
+          SELECT #{qt table_name}.#{q order_key} FROM #{qt table_name}
           WHERE #{join_cond}
           #{"AND #{sql}" if sql}
-          ORDER BY "#{table_name}"."#{order_key}" #{order_mode.to_s.upcase}
+          ORDER BY #{qt table_name}.#{q order_key} #{order_mode.to_s.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value
         FROM #{group_key_table}
@@ -66,11 +66,19 @@ module TopNLoader::SQLBuilder
       ON #{join_cond}
       AND (
         T.last_value IS NULL
-        OR "#{table_name}"."#{order_key}" #{order_op} T.last_value
-        OR "#{table_name}"."#{order_key}" is NULL
+        OR #{qt table_name}.#{q order_key} #{order_op} T.last_value
+        OR #{qt table_name}.#{q order_key} is NULL
       )
       #{"WHERE #{sql}" if sql}
     )
+  end
+
+  def self.q(name)
+    ActiveRecord::Base.connection.quote_column_name name
+  end
+
+  def self.qt(name)
+    ActiveRecord::Base.connection.quote_table_name name
   end
 
   def self.value_table(table, column, values)
@@ -111,12 +119,12 @@ module TopNLoader::SQLBuilder
     sql_binds = begin
       case value
       when NilClass
-        %("#{key}" IS NULL)
+        %(#{q key} IS NULL)
       when Range
         if value.exclude_end?
-          [%("#{key}" >= ? AND "#{key} < ?), value.begin, value.end]
+          [%(#{q key} >= ? AND #{q key} < ?), value.begin, value.end]
         else
-          [%("#{key}" BETWEEN ? AND ?), value.begin, value.end]
+          [%(#{q key} BETWEEN ? AND ?), value.begin, value.end]
         end
       when Hash
         raise ArgumentError, '' unless value.keys == [:not]
@@ -124,12 +132,12 @@ module TopNLoader::SQLBuilder
       when Enumerable
         array = value.to_a
         if array.include? nil
-          [%(("#{key}" IS NULL OR "#{key}" IN (?))), array.reject(&:nil?)]
+          [%((#{q key} IS NULL OR #{q key} IN (?))), array.reject(&:nil?)]
         else
-          [%("#{key}" IN (?)), array]
+          [%(#{q key} IN (?)), array]
         end
       else
-        [%("#{key}" = ?), value]
+        [%(#{q key} = ?), value]
       end
     end
     sanitize_sql_array sql_binds
