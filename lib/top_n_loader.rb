@@ -5,7 +5,8 @@ require 'top_n_loader/sql_builder'
 module TopNLoader
   class << self
     def load_associations(base_klass, ids, relation, limit:, order: nil)
-      raise ArgumentError, 'negative limit' if limit < 0
+      validate_ar_class! :base_klass, base_klass
+      validate_limit! limit
       return Hash.new { [] } if ids.empty? || limit.zero?
       klass = base_klass.reflections[relation.to_s].klass
       order_option = { limit: limit, **parse_order(klass, order) }
@@ -15,7 +16,8 @@ module TopNLoader
     end
 
     def load_groups(klass, column, keys, limit:, order: nil, condition: nil)
-      raise ArgumentError, 'negative limit' if limit < 0
+      validate_ar_class! :klass, klass
+      validate_limit! limit
       return Hash.new { [] } if keys.empty? || limit.zero?
       options = {
         klass: klass,
@@ -34,6 +36,15 @@ module TopNLoader
     end
 
     private
+
+    def validate_ar_class!(var_name, klass)
+      return if klass.is_a?(Class) && klass < ActiveRecord::Base
+      raise ArgumentError, "#{var_name} should be a subclass of ActiveRecord::Base"
+    end
+
+    def validate_limit!(limit)
+      raise ArgumentError, 'negative limit' if limit < 0
+    end
 
     def parse_order(klass, order)
       key, mode = begin
