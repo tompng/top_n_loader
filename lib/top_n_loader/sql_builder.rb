@@ -10,7 +10,7 @@ module TopNLoader::SQLBuilder
 
   def self.top_n_association_sql(klass, relation, limit:, order_mode:, order_key:)
     parent_table = klass.table_name
-    joins = klass.joins relation
+    joins = klass.joins relation.to_sym
     target_table = joins.join_sources.last.left.name
     join_sql = joins.to_sql.match(/FROM.+/)[0]
     %(
