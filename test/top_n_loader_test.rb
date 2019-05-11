@@ -62,7 +62,7 @@ class TopNLoaderTest < Minitest::Test
   end
 
   def test_reflection_explain
-    sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, :bars, limit: 3, order_mode: :asc, order_key: :id
+    sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, Bar, :bars, limit: 3, order_mode: :asc, order_key: :id
     explain = Bar.exec_explain [[sql, []]]
     assert !explain.include?('SCAN TABLE'), explain
   end
