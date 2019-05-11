@@ -3,6 +3,7 @@ require 'active_record'
 
 class Foo < ActiveRecord::Base
   has_many :bars, foreign_key: :int
+  has_many :barses, foreign_key: :int, class_name: 'Bar'
   has_many :normals, through: :bars
   has_many :stis, through: :bars
   has_many :stias, through: :bars, source: :stis, class_name: 'StiA'
@@ -14,10 +15,12 @@ class Bar < ActiveRecord::Base
   has_many :stis, foreign_key: :int
   has_many :normal_same_id_foos, through: :normals, source: :foo_with_same_id
   has_many :normal_same_id_foo_bars, through: :normal_same_id_foos, source: :bars
+  has_many :normal_same_id_foo_bar_singularized, through: :normal_same_id_foos, source: :barses
 end
 class Normal < ActiveRecord::Base
   belongs_to :bar, foreign_key: :int, required: false
   has_one :foo, through: :bar
+  has_many :bar_normal_same_id_foo_bars, through: :bar, source: :normal_same_id_foo_bars
   has_one :foo_with_same_id, class_name: 'Foo', foreign_key: :id, primary_key: :id
 end
 class Sti < ActiveRecord::Base

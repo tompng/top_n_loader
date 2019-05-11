@@ -8,10 +8,13 @@ module TopNLoader::SQLBuilder
     [condition_sql, sti_sql].compact.join ' AND '
   end
 
-  def self.top_n_association_sql(klass, relation, limit:, order_mode:, order_key:)
+  def self.top_n_association_sql(klass, target_klass, relation, limit:, order_mode:, order_key:)
     parent_table = klass.table_name
     joins = klass.joins relation.to_sym
-    target_table = joins.join_sources.last.left.name
+    target_table = target_klass.table_name
+    if target_table == klass.table_name
+      target_table = "#{joins.joins_values.first.to_s.pluralize}_#{target_table}"
+    end
     join_sql = joins.to_sql.match(/FROM.+/)[0]
     %(
       SELECT #{qt target_table}.*, top_n_group_key

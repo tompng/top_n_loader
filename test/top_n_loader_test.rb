@@ -50,10 +50,19 @@ class TopNLoaderTest < Minitest::Test
     expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bars, 8
     result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: 8
     assert_equal result, expected
+    expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, 8
+    result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, limit: 8
+    assert_equal result, expected
+  end
+
+  def test_including_self_join
+    expected = expected_associations_result Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, 8
+    result = TopNLoader.load_associations Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, limit: 8
+    assert_equal result, expected
   end
 
   def test_reflection_explain
-    sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, :bars, limit: 3, order_mode: :asc, order_key: :id
+    sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, Bar, :bars, limit: 3, order_mode: :asc, order_key: :id
     explain = Bar.exec_explain [[sql, []]]
     assert !explain.include?('SCAN TABLE'), explain
   end
