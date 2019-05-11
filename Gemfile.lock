@@ -1,28 +1,28 @@
 PATH
   remote: .
   specs:
-    top_n_loader (0.1.0)
+    top_n_loader (1.0.0)
       activerecord
 
 GEM
   remote: https://rubygems.org/
   specs:
-    activemodel (5.1.4)
-      activesupport (= 5.1.4)
-    activerecord (5.1.4)
-      activemodel (= 5.1.4)
-      activesupport (= 5.1.4)
-      arel (~> 8.0)
-    activesupport (5.1.4)
+    activemodel (5.2.3)
+      activesupport (= 5.2.3)
+    activerecord (5.2.3)
+      activemodel (= 5.2.3)
+      activesupport (= 5.2.3)
+      arel (>= 9.0)
+    activesupport (5.2.3)
       concurrent-ruby (~> 1.0, >= 1.0.2)
-      i18n (~> 0.7)
+      i18n (>= 0.7, < 2)
       minitest (~> 5.1)
       tzinfo (~> 1.1)
-    arel (8.0.0)
+    arel (9.0.0)
     coderay (1.1.2)
-    concurrent-ruby (1.0.5)
+    concurrent-ruby (1.1.5)
     docile (1.1.5)
-    i18n (0.9.4)
+    i18n (1.6.0)
       concurrent-ruby (~> 1.0)
     json (2.1.0)
     method_source (0.9.0)
@@ -54,4 +54,4 @@ DEPENDENCIES
   top_n_loader!
 
 BUNDLED WITH
-   1.16.1
+   1.17.2
