@@ -10,6 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{load top n records for each group}
   spec.description   = %q{load top n records for each group}
+  spec.homepage      = "https://github.com/tompng/#{spec.name}"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|
