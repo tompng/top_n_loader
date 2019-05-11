@@ -35,7 +35,7 @@ end
 
 ```ruby
 # Gemfile
-gem 'top_n_loader', github: 'tompng/top_n_loader'
+gem 'top_n_loader'
 ```
 
 ```ruby
