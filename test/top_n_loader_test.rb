@@ -50,6 +50,15 @@ class TopNLoaderTest < Minitest::Test
     expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bars, 8
     result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: 8
     assert_equal result, expected
+    expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, 8
+    result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, limit: 8
+    assert_equal result, expected
+  end
+
+  def test_including_self_join
+    expected = expected_associations_result Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, 8
+    result = TopNLoader.load_associations Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, limit: 8
+    assert_equal result, expected
   end
 
   def test_reflection_explain
