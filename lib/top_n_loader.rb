@@ -10,7 +10,7 @@ module TopNLoader
       return Hash.new { [] } if ids.empty? || limit.zero?
       klass = base_klass.reflect_on_association(relation.to_sym).klass
       order_option = { limit: limit, **parse_order(klass, order) }
-      sql = SQLBuilder.top_n_association_sql base_klass, klass, relation, order_option
+      sql = SQLBuilder.top_n_association_sql base_klass, klass, relation, **order_option
       records = klass.find_by_sql([sql, ids])
       format_result(records, klass: klass, **order_option)
     end
@@ -32,7 +32,7 @@ module TopNLoader
           **options
         )
       )
-      format_result records, options
+      format_result records, **options
     end
 
     private
