@@ -32,7 +32,6 @@ class StiB < Sti; end
 class StiAA < StiA; end
 class StiAB < StiA; end
 class StiAAB < StiAA; end
-Class.new(StiA)
 
 module DB
   DATABASE_CONFIG = {
