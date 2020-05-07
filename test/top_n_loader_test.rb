@@ -21,9 +21,9 @@ class TopNLoaderTest < Minitest::Test
   end
 
   def test_valid_seed
-    assert_equal Normal.count, 100
-    assert_equal Sti.count, 100
-    DB::VALUES.to_a.drop(2).take(1).each do |key, values|
+    assert_equal 100, Normal.count
+    assert_equal 100, Sti.count
+    DB::VALUES.each do |key, values|
       assert_equal Normal.count, Normal.where(key => values).count
       assert_equal Sti.count, Sti.where(key => values).count
     end
@@ -34,7 +34,7 @@ class TopNLoaderTest < Minitest::Test
     %i[foo bar].each do |relation|
       expected = Normal.find(1, 2, 3).map { |n| [n.id, [n.send(relation)]]}.to_h
       result = TopNLoader.load_associations Normal, [1, 2, 3], relation, limit: 8
-      assert_equal result, expected, relation
+      assert_equal expected, result, relation
     end
   end
 
@@ -42,23 +42,23 @@ class TopNLoaderTest < Minitest::Test
     %i[bars normals stis stias large_normals].each do |relation|
       expected = expected_associations_result Foo, [1, 2, 3], relation, 8
       result = TopNLoader.load_associations Foo, [1, 2, 3], relation, limit: 8
-      assert_equal result, expected, relation
+      assert_equal expected, result, relation
     end
   end
 
   def test_self_join
     expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bars, 8
     result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: 8
-    assert_equal result, expected
+    assert_equal expected, result
     expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, 8
     result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, limit: 8
-    assert_equal result, expected
+    assert_equal expected, result
   end
 
   def test_including_self_join
     expected = expected_associations_result Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, 8
     result = TopNLoader.load_associations Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, limit: 8
-    assert_equal result, expected
+    assert_equal expected, result
   end
 
   def test_reflection_explain
@@ -101,7 +101,7 @@ class TopNLoaderTest < Minitest::Test
       result = TopNLoader.load_groups klass, column, values, order: order, limit: limit
       expected = expected_groups_result records, column, limit
       message = "#{klass}, #{column}: #{values.inspect}, order: #{order}, limit: #{limit}"
-      assert_equal result, expected, message
+      assert_equal expected, result, message
     end
   end
 
@@ -109,10 +109,11 @@ class TopNLoaderTest < Minitest::Test
     TopNLoader.load_groups Normal, :int, [1, 2, 3], limit: 3
     TopNLoader.load_groups Normal, :int, [1, 2, 3], order: :desc, limit: 3
     TopNLoader.load_groups Normal, :int, [1, 2, 3], order: { string: :desc }, limit: 3
-    assert_equal TopNLoader.load_groups(Normal, :int, [], limit: 3), {}
-    assert_equal TopNLoader.load_groups(Normal, :int, [1, 2, 3], limit: 0), {}
-    assert_equal TopNLoader.load_groups(Normal, :int, [1, 2, 3], limit: 9)[4], []
-    assert_equal TopNLoader.load_groups(Normal, :int, [1, 2, 3], limit: 3)[4], []
+    empty_hash = {}
+    assert_equal empty_hash, TopNLoader.load_groups(Normal, :int, [], limit: 3)
+    assert_equal empty_hash, TopNLoader.load_groups(Normal, :int, [1, 2, 3], limit: 0)
+    assert_equal [], TopNLoader.load_groups(Normal, :int, [1, 2, 3], limit: 9)[4]
+    assert_equal [], TopNLoader.load_groups(Normal, :int, [1, 2, 3], limit: 3)[4]
     assert_raises(ArgumentError) { TopNLoader.load_groups Normal, :int, [1, 2, 3], limit: -1 }
     assert_raises(ArgumentError) { TopNLoader.load_groups Normal, :int, [1, 2, 3], order: :desk, limit: 3 }
     assert_raises(ArgumentError) { TopNLoader.load_groups Normal, :int, [1, 2, 3], order: { string: :desk }, limit: 3 }
