@@ -7,4 +7,9 @@ Rake::TestTask.new(:test) do |t|
   t.test_files = FileList["test/**/*_test.rb"]
 end
 
-task :default => :test
+desc "Run rubocop"
+task :rubocop do
+  sh 'bundle exec rubocop'
+end
+
+task default: [:rubocop, :test]
