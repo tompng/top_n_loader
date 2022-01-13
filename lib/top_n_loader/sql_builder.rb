@@ -28,13 +28,13 @@ module TopNLoader::SQLBuilder
           WHERE #{qt parent_table}.#{q klass.primary_key} = T.#{q klass.primary_key}
           ORDER BY #{qt target_table}.#{q order_key} #{order_mode.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
-        ) AS last_value
+        ) AS last_value_of_key
         FROM #{qt parent_table} as T where T.#{q klass.primary_key} in (?)
       ) T
       ON #{qt parent_table}.#{q klass.primary_key} = T.top_n_group_key
       AND (
-        T.last_value IS NULL
-        OR #{qt target_table}.#{q order_key} #{{ asc: :<=, desc: :>= }[order_mode]} T.last_value
+        T.last_value_of_key IS NULL
+        OR #{qt target_table}.#{q order_key} #{{ asc: :<=, desc: :>= }[order_mode]} T.last_value_of_key
         OR #{qt target_table}.#{q order_key} is NULL
       )
     )
@@ -63,13 +63,13 @@ module TopNLoader::SQLBuilder
           #{"AND #{sql}" if sql}
           ORDER BY #{qt table_name}.#{q order_key} #{order_mode.to_s.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
-        ) AS last_value
+        ) AS last_value_of_key
         FROM #{group_key_table}
       ) T
       ON #{join_cond}
       AND (
-        T.last_value IS NULL
-        OR #{qt table_name}.#{q order_key} #{order_op} T.last_value
+        T.last_value_of_key IS NULL
+        OR #{qt table_name}.#{q order_key} #{order_op} T.last_value_of_key
         OR #{qt table_name}.#{q order_key} is NULL
       )
       #{"WHERE #{sql}" if sql}
