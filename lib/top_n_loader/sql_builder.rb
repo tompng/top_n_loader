@@ -21,12 +21,16 @@ module TopNLoader::SQLBuilder
     target_order_key = "#{qt target_table}.#{q order_key}"
     return top_aggregate_sql target_table, order_key, parent_primary_key, from_sql: join_sql, order_mode: order_mode if limit == 1 && !nullable
 
+    needs_missing_check = nullable && order_mode == :asc
+    top_n_sufficient_sql, top_n_missing_cond = sufficiency_query target_table_name, join_sql, limit if needs_missing_check
+
     <<~SQL.squish
       SELECT #{qt target_table}.*, top_n_group_key
       #{join_sql}
       INNER JOIN
       (
         SELECT T.#{q klass.primary_key} AS top_n_group_key,
+        #{top_n_sufficient_sql}
         (
           SELECT #{target_order_key}
           #{join_sql}
@@ -36,7 +40,7 @@ module TopNLoader::SQLBuilder
         ) AS last_value_of_key
         FROM #{qt parent_table} AS T WHERE T.#{q klass.primary_key} IN (?)
       ) T
-      ON #{parent_primary_key} = T.top_n_group_key AND #{compare_cond target_order_key, order_mode, includes_nil: nullable}
+      ON #{parent_primary_key} = T.top_n_group_key AND #{compare_cond target_order_key, order_mode, includes_nil: nullable, top_n_missing_cond: top_n_missing_cond}
     SQL
   end
 
@@ -60,12 +64,17 @@ module TopNLoader::SQLBuilder
     group_key_table = value_table(:T, :top_n_group_key, group_keys)
     table_order_key = "#{qt table_name}.#{q order_key}"
     join_cond = equals_cond "#{qt table_name}.#{q group_column}", includes_nil: group_key_nullable
+
+    needs_missing_check = order_key_nullable && order_mode == :asc
+    top_n_sufficient_sql, top_n_missing_cond = sufficiency_query table_name, join_cond, limit if needs_missing_check
+
     <<~SQL.squish
       SELECT #{qt table_name}.*, top_n_group_key
       FROM #{qt table_name}
       INNER JOIN
       (
         SELECT top_n_group_key,
+        #{top_n_sufficient_sql}
         (
           SELECT #{table_order_key} FROM #{qt table_name}
           WHERE #{join_cond}
@@ -76,9 +85,21 @@ module TopNLoader::SQLBuilder
         FROM #{group_key_table}
       ) T
       ON #{join_cond}
-      AND #{compare_cond table_order_key, order_mode, includes_nil: order_key_nullable}
+      AND #{compare_cond table_order_key, order_mode, includes_nil: order_key_nullable, top_n_missing_cond: top_n_missing_cond}
       #{"WHERE #{sql}" if sql}
     SQL
+  end
+
+  def self.sufficiency_query(table_name, join_cond, limit)
+    sql = <<~SQL
+      (
+        SELECT 1 FROM #{qt table_name}
+        WHERE #{join_cond}
+        #{"AND #{sql}" if sql}
+        LIMIT 1 OFFSET #{limit.to_i - 1}
+      ) AS top_n_sufficient,
+    SQL
+    [sql, 'T.top_n_sufficient IS NULL']
   end
 
   def self.equals_cond(column, includes_nil:, t_column: 'T.top_n_group_key')
@@ -86,12 +107,11 @@ module TopNLoader::SQLBuilder
     includes_nil ? "(#{cond} OR (#{column} IS NULL AND #{t_column} IS NULL))" : cond
   end
 
-  def self.compare_cond(column, order_mode, includes_nil:, t_column: 'T.last_value_of_key')
+  def self.compare_cond(column, order_mode, includes_nil:, t_column: 'T.last_value_of_key', top_n_missing_cond: nil)
     if order_mode == :desc
       "(#{column} >= #{t_column} OR #{t_column} IS NULL)"
     elsif includes_nil
-      # t_column == nil if `result.size < limit` or `result[limit-1].order_column == nil`
-      "(#{column} <= #{t_column} OR #{column} IS NULL OR #{t_column} IS NULL)"
+      "(#{column} <= #{t_column} OR #{column} IS NULL OR #{top_n_missing_cond || "#{t_column} IS NULL"})"
     else
       "(#{column} <= #{t_column} OR #{t_column} IS NULL)"
     end
