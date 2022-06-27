@@ -12,68 +12,109 @@ module TopNLoader::SQLBuilder
     parent_table = klass.table_name
     joins = klass.joins relation.to_sym
     target_table = target_klass.table_name
+    nullable = nullable_column? target_klass, order_key
     if target_table == klass.table_name
       target_table = "#{joins.joins_values.first.to_s.pluralize}_#{target_table}"
     end
     join_sql = joins.to_sql.match(/FROM.+/)[0]
-    %(
+    parent_primary_key = "#{qt parent_table}.#{q klass.primary_key}"
+    target_order_key = "#{qt target_table}.#{q order_key}"
+    return top_aggregate_sql target_table, order_key, parent_primary_key, from_sql: join_sql, order_mode: order_mode if limit == 1 && !nullable
+
+    <<~SQL.squish
       SELECT #{qt target_table}.*, top_n_group_key
       #{join_sql}
       INNER JOIN
       (
-        SELECT T.#{q klass.primary_key} as top_n_group_key,
+        SELECT T.#{q klass.primary_key} AS top_n_group_key,
         (
-          SELECT #{qt target_table}.#{q order_key}
+          SELECT #{target_order_key}
           #{join_sql}
-          WHERE #{qt parent_table}.#{q klass.primary_key} = T.#{q klass.primary_key}
-          ORDER BY #{qt target_table}.#{q order_key} #{order_mode.upcase}
+          WHERE #{parent_primary_key} = T.#{q klass.primary_key}
+          ORDER BY #{target_order_key} #{order_mode.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value_of_key
-        FROM #{qt parent_table} as T where T.#{q klass.primary_key} in (?)
+        FROM #{qt parent_table} AS T WHERE T.#{q klass.primary_key} IN (?)
       ) T
-      ON #{qt parent_table}.#{q klass.primary_key} = T.top_n_group_key
-      AND (
-        T.last_value_of_key IS NULL
-        OR #{qt target_table}.#{q order_key} #{{ asc: :<=, desc: :>= }[order_mode]} T.last_value_of_key
-        OR #{qt target_table}.#{q order_key} is NULL
-      )
-    )
+      ON #{parent_primary_key} = T.top_n_group_key AND #{compare_cond target_order_key, order_mode, includes_nil: nullable}
+    SQL
   end
 
-
   def self.top_n_group_sql(klass:, group_column:, group_keys:, condition:, limit:, order_mode:, order_key:)
-    order_op = order_mode == :asc ? :<= : :>=
-    group_key_table = value_table(:T, :top_n_group_key, group_keys)
     table_name = klass.table_name
     sql = condition_sql klass, condition
-    join_cond = %(#{qt table_name}.#{q group_column} = T.top_n_group_key)
-    if group_keys.include? nil
-      nil_join_cond = %((#{qt table_name}.#{q group_column} IS NULL AND T.top_n_group_key IS NULL))
-      join_cond = %((#{join_cond} OR #{nil_join_cond}))
+    group_key_nullable = group_keys.include?(nil) && nullable_column?(klass, group_column)
+    order_key_nullable = nullable_column? klass, order_key
+    if limit == 1 && !order_key_nullable
+      generated_sql = top_aggregate_sql(
+        table_name,
+        order_key,
+        "#{qt table_name}.#{q group_column}",
+        from_sql: "FROM #{qt table_name}",
+        condition_sql: sql,
+        includes_nil: group_key_nullable,
+        order_mode: order_mode
+      )
+      return [generated_sql, group_keys - [nil]]
     end
-    %(
+    group_key_table = value_table(:T, :top_n_group_key, group_keys)
+    table_order_key = "#{qt table_name}.#{q order_key}"
+    join_cond = equals_cond "#{qt table_name}.#{q group_column}", includes_nil: group_key_nullable
+    <<~SQL.squish
       SELECT #{qt table_name}.*, top_n_group_key
       FROM #{qt table_name}
       INNER JOIN
       (
         SELECT top_n_group_key,
         (
-          SELECT #{qt table_name}.#{q order_key} FROM #{qt table_name}
+          SELECT #{table_order_key} FROM #{qt table_name}
           WHERE #{join_cond}
           #{"AND #{sql}" if sql}
-          ORDER BY #{qt table_name}.#{q order_key} #{order_mode.to_s.upcase}
+          ORDER BY #{table_order_key} #{order_mode.to_s.upcase}
           LIMIT 1 OFFSET #{limit.to_i - 1}
         ) AS last_value_of_key
         FROM #{group_key_table}
       ) T
       ON #{join_cond}
-      AND (
-        T.last_value_of_key IS NULL
-        OR #{qt table_name}.#{q order_key} #{order_op} T.last_value_of_key
-        OR #{qt table_name}.#{q order_key} is NULL
-      )
+      AND #{compare_cond table_order_key, order_mode, includes_nil: order_key_nullable}
       #{"WHERE #{sql}" if sql}
-    )
+    SQL
+  end
+
+  def self.equals_cond(column, includes_nil:, t_column: 'T.top_n_group_key')
+    cond = "#{column} = #{t_column}"
+    includes_nil ? "(#{cond} OR (#{column} IS NULL AND #{t_column} IS NULL))" : cond
+  end
+
+  def self.compare_cond(column, order_mode, includes_nil:, t_column: 'T.last_value_of_key')
+    if order_mode == :desc
+      "(#{column} >= #{t_column} OR #{t_column} IS NULL)"
+    elsif includes_nil
+      # t_column == nil if `result.size < limit` or `result[limit-1].order_column == nil`
+      "(#{column} <= #{t_column} OR #{column} IS NULL OR #{t_column} IS NULL)"
+    else
+      "(#{column} <= #{t_column} OR #{t_column} IS NULL)"
+    end
+  end
+
+  def self.top_aggregate_sql(target_table, order_key, group_table_column, from_sql:, order_mode:, condition_sql: nil, includes_nil: false)
+    target_order_key = "#{qt target_table}.#{q order_key}"
+    order_func = order_mode == :asc ? :MIN : :MAX
+    <<~SQL.squish
+      SELECT #{qt target_table}.*, top_n_group_key
+      #{from_sql}
+      INNER JOIN
+      (
+        SELECT #{group_table_column} AS top_n_group_key, #{order_func}(#{target_order_key}) AS top_value_of_key
+        #{from_sql}
+        WHERE (#{group_table_column} IN (?)#{" OR #{group_table_column} IS NULL" if includes_nil})
+        #{"AND #{condition_sql}" if condition_sql}
+        GROUP BY #{group_table_column}
+      ) T
+      ON #{equals_cond group_table_column, includes_nil: includes_nil}
+      AND #{target_order_key} = T.top_value_of_key
+      #{"AND #{condition_sql}" if condition_sql}
+    SQL
   end
 
   def self.q(name)
@@ -82,6 +123,10 @@ module TopNLoader::SQLBuilder
 
   def self.qt(name)
     ActiveRecord::Base.connection.quote_table_name name
+  end
+
+  def self.nullable_column?(klass, column)
+    klass.column_for_attribute(column).null
   end
 
   def self.value_table(table, column, values)
