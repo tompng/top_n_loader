@@ -2,7 +2,6 @@
 
 require 'bundler/setup'
 require 'top_n_loader'
-require 'pry'
 require_relative '../test/db'
 
-Pry.start
+binding.irb
