@@ -89,13 +89,11 @@ module TopNLoader::SQLBuilder
   end
 
   def self.compare_cond(column, order_mode, includes_nil:, t_column: 'T.top_n_order_key')
-    if order_mode == :desc
-      "(#{column} >= #{t_column} OR #{t_column} IS NULL)"
-    elsif includes_nil
-      # t_column == nil if `result.size < limit` or `result[limit-1].order_column == nil`
-      "(#{column} <= #{t_column} OR #{column} IS NULL OR #{t_column} IS NULL)"
+    op = order_mode == :asc ? '<=' : '>='
+    if includes_nil && (nil_first? ? order_mode == :asc : order_mode == :desc)
+      "(#{column} #{op} #{t_column} OR #{column} IS NULL OR #{t_column} IS NULL)"
     else
-      "(#{column} <= #{t_column} OR #{t_column} IS NULL)"
+      "(#{column} #{op} #{t_column} OR #{t_column} IS NULL)"
     end
   end
 
@@ -112,11 +110,19 @@ module TopNLoader::SQLBuilder
   end
 
   def self.value_table(table, column, values)
-    if ActiveRecord::Base.connection.adapter_name == 'PostgreSQL'
+    if postgres?
       values_value_table(table, column, values)
     else
       union_value_table(table, column, values)
     end
+  end
+
+  def self.nil_first?
+    !postgres?
+  end
+
+  def self.postgres?
+    ActiveRecord::Base.connection.adapter_name == 'PostgreSQL'
   end
 
   def self.union_value_table(table, column, values)

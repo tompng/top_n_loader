@@ -74,7 +74,7 @@ module TopNLoader
         existings, blanks = grouped_records.partition { |o| o[order_key] }
         existings.sort_by! { |o| [o[order_key], o[primary_key]] }
         blanks.sort_by! { |o| o[primary_key] }
-        ordered = blanks + existings
+        ordered = SQLBuilder.nil_first? ? blanks + existings : existings + blanks
         ordered.reverse! if order_mode == :desc
         ordered.take limit
       end

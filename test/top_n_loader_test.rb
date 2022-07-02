@@ -77,7 +77,7 @@ class TopNLoaderTest < Minitest::Test
 
   def test_group_explain
     [1, 3].each do |limit|
-      sql, binds = TopNLoader::SQLBuilder.top_n_group_sql(
+      sql, = TopNLoader::SQLBuilder.top_n_group_sql(
         klass: Normal,
         group_column: :int,
         group_keys: [1, 2, 3],
