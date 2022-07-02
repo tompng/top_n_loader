@@ -70,14 +70,14 @@ class TopNLoaderTest < Minitest::Test
   def test_reflection_explain
     [1, 3].each do |limit|
       sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, Bar, :bars, limit: limit, order_mode: :asc, order_key: :id
-      explain = Bar.exec_explain [[sql, []]]
+      explain = Bar.exec_explain [[sql.gsub('(?)', '(1, 2, 3)'), []]]
       assert !explain.include?('SCAN TABLE'), explain
     end
   end
 
   def test_group_explain
     [1, 3].each do |limit|
-      sql, = TopNLoader::SQLBuilder.top_n_group_sql(
+      sql, binds = TopNLoader::SQLBuilder.top_n_group_sql(
         klass: Normal,
         group_column: :int,
         group_keys: [1, 2, 3],
@@ -86,7 +86,7 @@ class TopNLoaderTest < Minitest::Test
         order_mode: :asc,
         order_key: :id
       )
-      explain = Normal.exec_explain([[sql, []]])
+      explain = Normal.exec_explain([[sql.gsub('(?)', '(1, 2, 3)'), []]])
       assert !explain.include?('SCAN TABLE'), explain
     end
   end
