@@ -53,7 +53,7 @@ module TopNLoader::SQLBuilder
     sql = condition_sql klass, condition
     group_key_nullable = group_keys.include?(nil) && nullable_column?(klass, group_column)
     order_key_nullable = nullable_column? klass, order_key
-    group_key_table = value_table(:T, :top_n_group_key, group_keys)
+    group_key_table = value_table :T, :top_n_group_key, group_keys
     table_order_key = "#{qt table_name}.#{q order_key}"
     join_cond = equals_cond "#{qt table_name}.#{q group_column}", includes_nil: group_key_nullable
     table_primary_key = "#{qt table_name}.#{q klass.primary_key}"
@@ -109,11 +109,19 @@ module TopNLoader::SQLBuilder
     klass.column_for_attribute(column).null
   end
 
+  def self.type_values(values)
+    return [nil, values] if sqlite?
+    groups = values.group_by { _1.is_a?(Time) || _1.is_a?(DateTime) ? 0 : _1.is_a?(Date) ? 1 : 2 }
+    type = groups[0] ? :TIMESTAMP : groups[1] ? :DATE : nil
+    [type, groups.sort.flat_map(&:last)]
+  end
+
   def self.value_table(table, column, values)
+    type, values = type_values values
     if postgres?
-      values_value_table(table, column, values)
+      values_value_table table, column, values, type
     else
-      union_value_table(table, column, values)
+      union_value_table table, column, values, type
     end
   end
 
@@ -121,20 +129,28 @@ module TopNLoader::SQLBuilder
     !postgres?
   end
 
-  def self.postgres?
-    ActiveRecord::Base.connection.adapter_name == 'PostgreSQL'
+  def self.adapter_name
+    ActiveRecord::Base.connection.adapter_name
   end
 
-  def self.union_value_table(table, column, values)
+  def self.postgres?
+    adapter_name == 'PostgreSQL'
+  end
+
+  def self.sqlite?
+    adapter_name == 'SQLite'
+  end
+
+  def self.union_value_table(table, column, values, type)
     sanitize_sql_array [
-      "(SELECT ? AS #{column}#{' UNION SELECT ?' * (values.size - 1)}) AS #{table}",
+      "(SELECT #{"#{type} " if type}? AS #{column}#{' UNION SELECT ?' * (values.size - 1)}) AS #{table}",
       *values
     ]
   end
 
-  def self.values_value_table(table, column, values)
+  def self.values_value_table(table, column, values, type)
     sanitize_sql_array [
-      "(VALUES #{(['(?)'] * values.size).join(',')}) AS #{table} (#{column})",
+      "(VALUES (#{"#{type} " if type}?) #{', (?)' * (values.size - 1)}) AS #{table} (#{column})",
       *values
     ]
   end
