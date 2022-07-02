@@ -4,4 +4,5 @@ require 'bundler/setup'
 require 'top_n_loader'
 require_relative '../test/db'
 
+DB.connect DB::DATABASE_CONFIG_SQLITE3
 binding.irb
