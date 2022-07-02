@@ -40,6 +40,16 @@ module DB
     pool: 5,
     timeout: 5000
   }
+  DATABASE_CONFIG_PG = {
+    url: 'postgres://postgres:password@pg/top_n_db',
+    pool: 5,
+    timeout: 5000
+  }
+  DATABASE_CONFIG_MYSQL = {
+    url: 'mysql2://root:password@mysql/top_n_db',
+    pool: 5,
+    timeout: 5000
+  }
 
   ActiveRecord::Base.logger = Logger.new(STDOUT)
 
