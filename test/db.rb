@@ -34,18 +34,27 @@ class StiAB < StiA; end
 class StiAAB < StiAA; end
 
 module DB
-  DATABASE_CONFIG = {
+  DATABASE_CONFIG_SQLITE3 = {
     adapter: 'sqlite3',
-    database: ENV['DATABASE_NAME'] || 'test/development.sqlite3',
+    database: 'test/development.sqlite3',
     pool: 5,
     timeout: 5000
   }
-  ActiveRecord::Base.establish_connection DATABASE_CONFIG
+
   ActiveRecord::Base.logger = Logger.new(STDOUT)
 
-  def self.migrate
-    File.unlink DATABASE_CONFIG[:database] if File.exist? DATABASE_CONFIG[:database]
-    ActiveRecord::Base.clear_all_connections!
+  def self.connect(config)
+    ActiveRecord::Base.establish_connection config
+  end
+
+  def self.migrate(config)
+    if config[:adapter] == 'sqlite3'
+      File.unlink config[:database] if File.exist? config[:database]
+    else
+      ActiveRecord::Tasks::DatabaseTasks.drop config
+      ActiveRecord::Tasks::DatabaseTasks.create config
+    end
+    connect config
     ActiveRecord::Migration::Current.class_eval do
       create_table :foos do |t|
         t.string :string

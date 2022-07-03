@@ -39,46 +39,56 @@ class TopNLoaderTest < Minitest::Test
   end
 
   def test_has_many_reflections
-    %i[bars normals stis stias large_normals].each do |relation|
-      expected = expected_associations_result Foo, [1, 2, 3], relation, 8
-      result = TopNLoader.load_associations Foo, [1, 2, 3], relation, limit: 8
-      assert_equal expected, result, relation
+    [1, 8].each do |limit|
+      %i[bars normals stis stias large_normals].each do |relation|
+        expected = expected_associations_result Foo, [1, 2, 3], relation, limit
+        result = TopNLoader.load_associations Foo, [1, 2, 3], relation, limit: limit
+        assert_equal expected, result, relation
+      end
     end
   end
 
   def test_self_join
-    expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bars, 8
-    result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: 8
-    assert_equal expected, result
-    expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, 8
-    result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, limit: 8
-    assert_equal expected, result
+    [1, 8].each do |limit|
+      expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bars, limit
+      result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bars, limit: limit
+      assert_equal expected, result
+      expected = expected_associations_result Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, limit
+      result = TopNLoader.load_associations Bar, [1, 2, 3], :normal_same_id_foo_bar_singularized, limit: limit
+      assert_equal expected, result
+    end
   end
 
   def test_including_self_join
-    expected = expected_associations_result Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, 8
-    result = TopNLoader.load_associations Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, limit: 8
-    assert_equal expected, result
+    [1, 8].each do |limit|
+      expected = expected_associations_result Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, limit
+      result = TopNLoader.load_associations Normal, [1, 2, 3], :bar_normal_same_id_foo_bars, limit: limit
+      assert_equal expected, result
+    end
   end
 
   def test_reflection_explain
-    sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, Bar, :bars, limit: 3, order_mode: :asc, order_key: :id
-    explain = Bar.exec_explain [[sql, []]]
-    assert !explain.include?('SCAN TABLE'), explain
+    [1, 3].each do |limit|
+      sql = TopNLoader::SQLBuilder.top_n_association_sql Foo, Bar, :bars, limit: limit, order_mode: :asc, order_key: :id
+      explain = Bar.exec_explain [[sql.gsub('(?)', '(1, 2, 3)'), []]]
+      assert !explain.include?('SCAN TABLE'), explain
+    end
   end
 
   def test_group_explain
-    sql = TopNLoader::SQLBuilder.top_n_group_sql(
-      klass: Normal,
-      group_column: :int,
-      group_keys: [1, 2, 3],
-      condition: nil,
-      limit: 3,
-      order_mode: :asc,
-      order_key: :id
-    )
-    explain = Normal.exec_explain([[sql, []]])
-    assert !explain.include?('SCAN TABLE'), explain
+    [1, 3].each do |limit|
+      sql, = TopNLoader::SQLBuilder.top_n_group_sql(
+        klass: Normal,
+        group_column: :int,
+        group_keys: [1, 2, 3],
+        condition: nil,
+        limit: limit,
+        order_mode: :asc,
+        order_key: :id
+      )
+      explain = Normal.exec_explain([[sql.gsub('(?)', '(1, 2, 3)'), []]])
+      assert !explain.include?('SCAN TABLE'), explain
+    end
   end
 
   def test_combinations
@@ -95,7 +105,7 @@ class TopNLoaderTest < Minitest::Test
       [{ string: :asc }, { string: :asc, id: :asc }],
       [{ string: :desc }, { string: :desc, id: :desc }]
     ]
-    limits = [2, 32]
+    limits = [1, 2, 32]
     classes.product column_values_list, orders, limits do |klass, (column, values), (order, ar_order), limit|
       records = klass.where(column => values).order(ar_order)
       result = TopNLoader.load_groups klass, column, values, order: order, limit: limit
@@ -128,11 +138,13 @@ class TopNLoaderTest < Minitest::Test
     top_n_condition1 = { string: string_include, id: { not: id_exclude }, not: { date: date_not } }
     top_n_condition2 = { string: string_include, not: { id: id_exclude }, date: { not: date_not } }
     records = Normal.where(string: string_include).where.not(id: id_exclude).where.not(date: date_not).order(id: :desc)
-    expected = expected_groups_result(records, :int, 32)
-    result1 = TopNLoader.load_groups Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition1
-    result2 = TopNLoader.load_groups Normal, :int, ints, order: :desc, limit: 32, condition: top_n_condition2
-    assert_equal result1, result2
-    assert_equal expected, result1
-    assert_equal expected, result2
+    [1, 2, 32].each do |limit|
+      expected = expected_groups_result(records, :int, limit)
+      result1 = TopNLoader.load_groups Normal, :int, ints, order: :desc, limit: limit, condition: top_n_condition1
+      result2 = TopNLoader.load_groups Normal, :int, ints, order: :desc, limit: limit, condition: top_n_condition2
+      assert_equal result1, result2
+      assert_equal expected, result1
+      assert_equal expected, result2
+    end
   end
 end
