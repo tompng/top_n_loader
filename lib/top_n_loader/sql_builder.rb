@@ -125,6 +125,10 @@ module TopNLoader::SQLBuilder
     end
   end
 
+  def self.values_table_batch_size
+    sqlite? ? 200 : 1000
+  end
+
   def self.nil_first?
     !postgres?
   end

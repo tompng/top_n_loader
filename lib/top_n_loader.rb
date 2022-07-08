@@ -25,13 +25,17 @@ module TopNLoader
         limit: limit,
         **parse_order(klass, order)
       }
-      records = klass.find_by_sql(
-        SQLBuilder.top_n_group_sql(
-          group_keys: keys,
-          condition: condition,
-          **options
+      keys = keys.uniq
+      batch_size = keys.size.fdiv(keys.size.fdiv(SQLBuilder.values_table_batch_size).ceil).ceil
+      records = keys.each_slice(batch_size).flat_map do |batch_keys|
+        klass.find_by_sql(
+          SQLBuilder.top_n_group_sql(
+            group_keys: batch_keys,
+            condition: condition,
+            **options
+          )
         )
-      )
+      end
       format_result records, **options
     end
 

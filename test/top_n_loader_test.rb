@@ -130,6 +130,30 @@ class TopNLoaderTest < Minitest::Test
     assert_raises(ArgumentError) { TopNLoader.load_groups Normal, :int, [1, 2, 3], order: :desc }
   end
 
+  def test_batch_load
+    method_name = :values_table_batch_size
+    method_called = false
+    original_method = TopNLoader::SQLBuilder.method method_name
+    TopNLoader::SQLBuilder.define_singleton_method method_name do
+      method_called = true
+      2
+    end
+    begin
+      valeus = [1, 2, 3, 4, 5]
+      column = :int
+      values = [1, 2, 3, 4, 5]
+      limit = 3
+      records = Normal.where(column => values).order(id: :asc)
+      result = TopNLoader.load_groups Normal, column, values, limit: limit
+      expected = expected_groups_result records, column, limit
+      assert method_called
+      assert_equal expected, result
+      binding.irb
+    ensure
+      TopNLoader::SQLBuilder.define_singleton_method(method_name, &original_method)
+    end
+  end
+
   def test_conditions
     ints = DB::VALUES[:int]
     string_include = DB::VALUES[:string].sample(4) + [nil]
