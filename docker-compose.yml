@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  pg:
+    image: postgres
+    volumes:
+      - ./tmp/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: password
+  mysql:
+    image: mysql:8.0.25
+    volumes:
+      - ./tmp/db:/var/lib/mysql_data
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+  gem:
+    build: .
+    command: sleep 100000
+    volumes:
+      - .:/myapp
+    depends_on:
+      - pg

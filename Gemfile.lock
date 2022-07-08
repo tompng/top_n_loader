@@ -23,9 +23,11 @@ GEM
     i18n (1.10.0)
       concurrent-ruby (~> 1.0)
     minitest (5.16.1)
+    mysql2 (0.5.4)
     parallel (1.22.1)
     parser (3.1.2.0)
       ast (~> 2.4.1)
+    pg (1.4.1)
     rainbow (3.1.1)
     rake (13.0.6)
     regexp_parser (2.5.0)
@@ -61,6 +63,8 @@ PLATFORMS
 DEPENDENCIES
   bundler
   minitest
+  mysql2
+  pg
   rake
   rubocop
   rubocop-rubycw
