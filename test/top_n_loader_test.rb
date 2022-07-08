@@ -148,7 +148,6 @@ class TopNLoaderTest < Minitest::Test
       expected = expected_groups_result records, column, limit
       assert method_called
       assert_equal expected, result
-      binding.irb
     ensure
       TopNLoader::SQLBuilder.define_singleton_method(method_name, &original_method)
     end
