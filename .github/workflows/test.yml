@@ -5,10 +5,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: [ '2.7', '3.0', '3.1' ]
+        ruby: [ '3.2', '3.3', '3.4' ]
         gemfiles:
           - gemfiles/Gemfile-rails-6.0
           - gemfiles/Gemfile-rails-7.0
+          - gemfiles/Gemfile-rails-8.0
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
