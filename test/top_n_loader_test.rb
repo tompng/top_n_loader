@@ -139,7 +139,6 @@ class TopNLoaderTest < Minitest::Test
       2
     end
     begin
-      valeus = [1, 2, 3, 4, 5]
       column = :int
       values = [1, 2, 3, 4, 5]
       limit = 3
